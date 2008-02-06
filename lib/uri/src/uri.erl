@@ -32,7 +32,7 @@
 
 -module(uri).
 
--export([from_string/1]).
+-export([new/8, from_string/1, from_http_1_1/3]).
 -export([query_foldl/3]).
 -export([query_to_dict/1, query_to_tl/1]).
 -export([quote/1, quote/2]).
@@ -99,11 +99,24 @@ from_string(Uri) ->
 
     {Path, Uri3} = parse_path(Uri2),
     {Query, Uri4} = parse_query(Uri3),
-    {Frag, Uri5} = parse_frag(Uri4),
-    case Uri5 of
-        [] -> ok;
-        _ -> throw({uri_error, {data_left_after_parsing, Uri5}})
-    end,
+    Frag = parse_frag(Uri4),
+    new(Scheme, UserInfo, Host, Port, Path, Query, Frag, Uri).
+
+%% @doc Populate a new #uri record by using `Scheme' and parsing
+%% `HostPort' string `Uri'
+%% @spec from_http_1_1(string(), string(), string()) -> uri()
+from_http_1_1(Scheme, HostPort, Uri) ->
+    {Host, Port} = parse_host_port(HostPort),
+    {Path, Uri1} = parse_path(Uri),
+    {Query, Uri2} = parse_query(Uri1),
+    Frag = parse_frag(Uri2),
+    RawUri = Scheme ++ "://" ++ HostPort ++ Uri,
+    new(Scheme, "", Host, Port, Path, Query, Frag, RawUri).
+
+%% @doc Return a uri record with the given fields.
+%% @spec new(string(), string(), string(), string(), string(),
+%%           string(), string(), string()) -> uri()
+new(Scheme, UserInfo, Host, Port, Path, Query, Frag, Uri) ->
     #uri{scheme = Scheme,
          user_info = unquote(UserInfo),
          host = Host,
@@ -205,9 +218,11 @@ parse_query_test() ->
     ?assertMatch({"", ""}, parse_query("")).
 
 parse_frag([$# | Frag]) ->
-    Frag;
+    unquote(Frag);
 parse_frag("") ->
-    "".
+    "";
+parse_frag(Data) ->
+    throw({uri_error, {data_left_after_parsing, Data}}).
 
 %% @doc Convert the string or the `raw_query' portion of {@link uri()} into
 %%      a dictionary, where the keys are strings, the values are strings,
