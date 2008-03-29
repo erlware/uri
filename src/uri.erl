@@ -79,7 +79,7 @@
 %%            `"http://somehost.com/index.html#Section+5"'. It will be
 %%            The empty string if no fragment is found.</dd>
 %%
-%%        <dt>full::string()</dt>
+%%        <dt>raw::string()</dt>
 %%        <dd>This is the original uri that the above fields were populated
 %%            from. Everything will still be in their original quoted form.
 %%            Note that this may be a best guess as to the uri a user had
