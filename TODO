@@ -1,0 +1,3 @@
++ support uri creation
++ support ipv6 addresses in names, see:
+  http://en.wikipedia.org/wiki/IPv6#Literal_IPv6_addresses_in_URLs
