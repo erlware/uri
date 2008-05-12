@@ -35,6 +35,7 @@
 -export([new/7, new/8, from_string/1, from_http_1_1/3, to_string/1]).
 -export([query_foldl/3]).
 -export([query_to_dict/1, query_to_tl/1]).
+-export([to_query/1, to_query/2]).
 -export([quote/1, quote/2]).
 -export([unquote/1]).
 -export([scheme/1, scheme/2, user_info/1, user_info/2, host/1, host/2]).
@@ -70,7 +71,7 @@
 %%            be unquoted, so `"http://somehost.com/name+with%20spaces"'
 %%            will be `"/name with spaces"'</dd>
 %%
-%%        <dt>raw_query::string()</dt>
+%%        <dt>raw_query::iolist()</dt>
 %%        <dd>This is the not unquoted. Probably the most convient way to
 %%            access the query componant will be to use {@link query_to_tl/1}
 %%            or {@link query_to_dict/1}. The value will be the empty string
@@ -319,8 +320,6 @@ query_to_tl_test() ->
 %% @see query_to_dict/1
 %% @spec query_foldl(F::function(), term(), Query) -> term()
 %%       Query = string() | uri()
-query_foldl(F, Init, Query) when is_binary(Query) ->
-    query_foldl(F, Init, binary_to_list(Query));
 query_foldl(F, Init, #uri{raw_query = Query}) ->
     query_foldl(F, Init, Query);
 query_foldl(F, Init, Query) ->
@@ -331,7 +330,59 @@ query_foldl(F, Init, Query) ->
                             [Key] ->
                                 F({unquote(Key), true}, Acc)
                         end
-                end, Init, string:tokens(Query, "&")).
+                end, Init, string:tokens(iolist_to_string(Query), "&")).
+
+iolist_to_string(Str) ->
+    binary_to_list(iolist_to_binary(Str)).
+
+%% @doc Convert a dictionary or tuple-list to an iolist representing the
+%% query part of a uri. Keys and values can be binaries, lists, atoms,
+%% integers or floats, and will be automatically converted to a string and
+%% quoted.
+%% @spec(KeyValues) -> iolist().
+%%     KeyValues = dict() | tuple_list().
+to_query({dict,_,_,_,_,_,_,_,_} = Dict) ->
+    to_query(fun dict:fold/3, Dict);
+to_query(List) ->
+    to_query(fun lists:foldl/3, List).
+
+%% @doc Return an iolist representing the query part of a uri by
+%% folding over `Ds' by calling the provided `FoldF', which should
+%% take three arguments: a function, an initial accumulator value, and
+%% the datastructure to fold over.
+%% @see to_query/1
+%% @spec(function(), term()) -> iolist().
+to_query(FoldF, Ds) ->
+    string_join($&,
+                FoldF(fun ({K, V}, Acc) ->
+                              [[quote(el_to_string(K), 'query'), $=,
+                                quote(el_to_string(V), 'query')] | Acc];
+                          (K, Acc) ->
+                              [quote(el_to_string(K), 'query') | Acc]
+                      end, [], Ds)).
+
+to_query_test() ->
+    ?assertMatch(
+       "one&two=2&three=two%20%2B%20one",
+       iolist_to_string(to_query([one, {"two", 2}, {"three", "two + one"}]))).
+
+
+el_to_string(El) when is_atom(El) ->
+    atom_to_list(El);
+el_to_string(El) when is_number(El) ->
+    integer_to_list(El);
+el_to_string(El) when is_float(El) ->
+    float_to_list(El);
+el_to_string(El) ->
+    El.
+
+string_join(_, []) ->
+    "";
+string_join(_, [Str]) ->
+    Str;
+string_join(Join, List) ->
+    lists:foldl(fun (Str, Acc) -> [Str, Join | Acc] end, hd(List), tl(List)).
+
 
 %% @doc Return `Str' with all `+' replaced with space, and `%NN' replaced
 %%      with the decoded byte.
@@ -540,7 +591,7 @@ raw(#uri{raw = Raw}) ->
     Raw.
 
 update_raw(Uri) ->
-    Uri#uri{raw = binary_to_list(iolist_to_binary(to_iolist(Uri)))}.
+    Uri#uri{raw = iolist_to_string(to_iolist(Uri))}.
 
 to_iolist(Uri) ->
     [Uri#uri.scheme, <<"://">>, user_info_to_string(Uri), Uri#uri.host,
