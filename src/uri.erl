@@ -93,7 +93,7 @@
 
 
 %% @doc Populate a new #uri record by parsing the string `Uri'
-%% @spec from_string(string()) -> uri()
+%% @spec(string()) -> uri()
 from_string(Uri) ->
     {Scheme, Uri1} = parse_scheme(Uri),
 
@@ -113,7 +113,7 @@ to_string(#uri{raw = Raw}) ->
 
 %% @doc Populate a new #uri record by using `Scheme' and parsing
 %% `HostPort' string `Uri'
-%% @spec from_http_1_1(string(), string(), string()) -> uri()
+%% @spec(string(), string(), string()) -> uri()
 from_http_1_1(Scheme, HostPort, Uri) ->
     {Host, Port} = parse_host_port(HostPort),
     {Path, Uri1} = parse_path(Uri),
@@ -125,8 +125,8 @@ from_http_1_1(Scheme, HostPort, Uri) ->
 %% that isn't used.
 %%
 %% You probably want {@link raw/7} unless you've parsed a uri yourself.
-%% @spec new(string(), string(), string(), integer(), string(),
-%%           string(), string(), string()) -> uri()
+%% @spec(string(), string(), string(), integer(), string(),
+%%       string(), string(), string()) -> uri()
 new(Scheme, UserInfo, Host, Port, Path, Query, Frag, Uri) ->
     update_raw(#uri{scheme = Scheme,
                     user_info = unquote(UserInfo),
@@ -139,8 +139,8 @@ new(Scheme, UserInfo, Host, Port, Path, Query, Frag, Uri) ->
 
 %% @doc Return a uri record with the given fields. Use `""' for any field
 %% that isn't used.
-%% @spec new(string(), string(), string(), integer(), string(),
-%%           string(), string()) -> uri()
+%% @spec(string(), string(), string(), integer(), string(),
+%%       string(), string()) -> uri()
 new(Scheme, UserInfo, Host, Port, Path, Query, Frag) ->
     update_raw(#uri{scheme = Scheme,
                     user_info = unquote(UserInfo),
@@ -294,7 +294,7 @@ frag_to_string(#uri{frag = Frag}) ->
 %%      useful for decoding the `Post' body of an HTTP form submission.
 %% @todo make a form of this that for keys specified multiple times, return
 %%       them as some kind of a list
-%% @spec query_to_dict(Query) -> dict()
+%% @spec(Query) -> dict().
 %%       Query = string() | uri()
 query_to_dict(Query) ->
     query_foldl(fun ({K, V}, D) -> dict:store(K, V, D) end, dict:new(), Query).
@@ -305,7 +305,7 @@ query_to_dict(Query) ->
 %%      {@link query_to_dict/1} will currently overwrite earlier values where
 %%      this will return a tuple-list with multiple key entries.
 %% @see query_to_dict/1
-%% @spec query_to_tl(Query) -> dict()
+%% @spec(Query) -> dict().
 %%       Query = string() | uri()
 query_to_tl(Query) ->
     lists:reverse(query_foldl(fun (KV, Acc) -> [KV | Acc] end, [], Query)).
@@ -318,7 +318,7 @@ query_to_tl_test() ->
 %%      `F("range", "5-50", Acc)' and `F("printable", true, Acc)'.
 %%      Both `Key' and `Value' are already unquoted when `F' is called.
 %% @see query_to_dict/1
-%% @spec query_foldl(F::function(), term(), Query) -> term()
+%% @spec(F::function(), term(), Query) -> term().
 %%       Query = string() | uri()
 query_foldl(F, Init, #uri{raw_query = Query}) ->
     query_foldl(F, Init, Query);
@@ -386,7 +386,7 @@ string_join(Join, List) ->
 
 %% @doc Return `Str' with all `+' replaced with space, and `%NN' replaced
 %%      with the decoded byte.
-%% @spec unquote(string()) -> string()
+%% @spec(string()) -> string().
 unquote(Str) ->
     unquote(Str, []).
 
@@ -408,7 +408,7 @@ unquote([C | Str], Acc) ->
 %%      quoted form. For instance `"A Space"' becomes `"A%20Space"'.
 %%      This is the same as calling `quote(Str, any)'.
 %% @see quote/2
-%% @spec quote(string()) -> string()
+%% @spec(string()) -> string().
 quote(Str) ->
     quote(Str, any).
 
@@ -447,7 +447,7 @@ quote(Str) ->
 %%       <dt>frag</dt>
 %%       <dd>Quote for the fragment part of a uri</dd>
 %%      </dl>
-%% @spec quote(string(), atom()) -> string()
+%% @spec(string(), atom()) -> string()
 quote(Str, Part) ->
     lists:reverse(lists:foldl(fun (C, Acc) ->
                                       [escape_for_part(C, Part) | Acc]
