@@ -32,11 +32,14 @@
 
 -module(uri).
 
--export([new/8, from_string/1, from_http_1_1/3]).
+-export([new/7, new/8, from_string/1, from_http_1_1/3, to_string/1]).
 -export([query_foldl/3]).
 -export([query_to_dict/1, query_to_tl/1]).
 -export([quote/1, quote/2]).
 -export([unquote/1]).
+-export([scheme/1, scheme/2, user_info/1, user_info/2, host/1, host/2]).
+-export([port/1, port/2, path/1, path/2, raw_query/1, raw_query/2]).
+-export([frag/1, frag/2, raw/1]).
 
 -include("eunit.hrl").
 -include("uri.hrl").
@@ -102,6 +105,11 @@ from_string(Uri) ->
     Frag = parse_frag(Uri4),
     new(Scheme, UserInfo, Host, Port, Path, Query, Frag, Uri).
 
+%% @doc Return the string this uri represents. (Same as the `raw' field)
+%% @spec(uri()) -> string()
+to_string(#uri{raw = Raw}) ->
+    Raw.
+
 %% @doc Populate a new #uri record by using `Scheme' and parsing
 %% `HostPort' string `Uri'
 %% @spec from_http_1_1(string(), string(), string()) -> uri()
@@ -110,21 +118,41 @@ from_http_1_1(Scheme, HostPort, Uri) ->
     {Path, Uri1} = parse_path(Uri),
     {Query, Uri2} = parse_query(Uri1),
     Frag = parse_frag(Uri2),
-    RawUri = Scheme ++ "://" ++ HostPort ++ Uri,
-    new(Scheme, "", Host, Port, Path, Query, Frag, RawUri).
+    new(Scheme, "", Host, Port, Path, Query, Frag).
 
-%% @doc Return a uri record with the given fields.
-%% @spec new(string(), string(), string(), string(), string(),
+%% @doc Return a uri record with the given fields. Use `""' for any field
+%% that isn't used.
+%%
+%% You probably want {@link raw/7} unless you've parsed a uri yourself.
+%% @spec new(string(), string(), string(), integer(), string(),
 %%           string(), string(), string()) -> uri()
 new(Scheme, UserInfo, Host, Port, Path, Query, Frag, Uri) ->
-    #uri{scheme = Scheme,
-         user_info = unquote(UserInfo),
-         host = Host,
-         port = Port,
-         path = unquote(Path),
-         raw_query = Query,
-         frag = unquote(Frag),
-         raw=Uri}.
+    update_raw(#uri{scheme = Scheme,
+                    user_info = unquote(UserInfo),
+                    host = Host,
+                    port = Port,
+                    path = unquote(Path),
+                    raw_query = Query,
+                    frag = unquote(Frag),
+                    raw = Uri}).
+
+%% @doc Return a uri record with the given fields. Use `""' for any field
+%% that isn't used.
+%% @spec new(string(), string(), string(), integer(), string(),
+%%           string(), string()) -> uri()
+new(Scheme, UserInfo, Host, Port, Path, Query, Frag) ->
+    update_raw(#uri{scheme = Scheme,
+                    user_info = unquote(UserInfo),
+                    host = Host,
+                    port = Port,
+                    path = unquote(Path),
+                    raw_query = Query,
+                    frag = unquote(Frag)}).
+
+new_test() ->
+    ?assertMatch("http://myhost.com:8080/my/path?color=red#Section%205",
+                 to_string(new("http", "", "myhost.com", 8080, "/my/path",
+                               "color=red", "Section 5"))).
 
 parse_scheme(Uri) ->
     parse_scheme(Uri, []).
@@ -223,6 +251,31 @@ parse_frag("") ->
     "";
 parse_frag(Data) ->
     throw({uri_error, {data_left_after_parsing, Data}}).
+
+user_info_to_string(#uri{user_info = ""}) ->
+    "";
+user_info_to_string(#uri{user_info = UserInfo}) ->
+    [UserInfo, $@].
+
+port_to_string(#uri{port = ""}) ->
+    "";
+port_to_string(#uri{port = Port}) ->
+    [$: | integer_to_list(Port)].
+
+path_to_string(#uri{path = ""}) ->
+    $/;
+path_to_string(#uri{path = Path}) ->
+    quote(Path, path).
+
+raw_query_to_string(#uri{raw_query = ""}) ->
+    "";
+raw_query_to_string(#uri{raw_query = RawQuery}) ->
+    [$? | RawQuery].
+
+frag_to_string(#uri{frag = ""}) ->
+    "";
+frag_to_string(#uri{frag = Frag}) ->
+    [$#, quote(Frag, frag)].
 
 %% @doc Convert the string or the `raw_query' portion of {@link uri()} into
 %%      a dictionary, where the keys are strings, the values are strings,
@@ -411,3 +464,85 @@ is_mark($() -> true;
 is_mark($)) -> true;
 is_mark(_) -> false.
 
+%% @doc Return the scheme field of {@link uri()}.
+%% @spec(uri()) -> string()
+scheme(#uri{scheme = Scheme}) ->
+    Scheme.
+
+%% @doc Set the scheme field of {@link uri()}.
+%% @spec(string()) -> uri()
+scheme(Uri, NewScheme) ->
+    update_raw(Uri#uri{scheme = NewScheme}).
+
+%% @doc Return the user_info field of {@link uri()}.
+%% @spec(uri()) -> string()
+user_info(#uri{user_info = UserInfo}) ->
+    UserInfo.
+
+%% @doc Set the user_info field of {@link uri()}.
+%% @spec(string()) -> uri()
+user_info(Uri, NewUserInfo) ->
+    update_raw(Uri#uri{user_info = NewUserInfo}).
+
+%% @doc Return the host field of {@link uri()}.
+%% @spec(uri()) -> string()
+host(#uri{host = Host}) ->
+    Host.
+
+%% @doc Set the host field of {@link uri()}.
+%% @spec(string()) -> uri()
+host(Uri, NewHost) ->
+    update_raw(Uri#uri{host = NewHost}).
+
+%% @doc Return the port field of {@link uri()}.
+%% @spec(uri()) -> integer()
+port(#uri{port = Port}) ->
+    Port.
+
+%% @doc Set the port field of {@link uri()}.
+%% @spec(integer()) -> uri()
+port(Uri, NewPort) ->
+    update_raw(Uri#uri{port = NewPort}).
+
+%% @doc Return the path field of {@link uri()}.
+%% @spec(uri()) -> string()
+path(#uri{path = Path}) ->
+    Path.
+
+%% @doc Set the path field of {@link uri()}.
+%% @spec(string()) -> uri()
+path(Uri, NewPath) ->
+    update_raw(Uri#uri{path = NewPath}).
+
+%% @doc Return the raw_query field of {@link uri()}.
+%% @spec(uri()) -> string()
+raw_query(#uri{raw_query = RawQuery}) ->
+    RawQuery.
+
+%% @doc Set the raw_query field of {@link uri()}.
+%% @spec(string()) -> uri()
+raw_query(Uri, NewRawQuery) ->
+    update_raw(Uri#uri{raw_query = NewRawQuery}).
+
+%% @doc Return the frag field of {@link uri()}.
+%% @spec(uri()) -> string()
+frag(#uri{frag = Frag}) ->
+    Frag.
+
+%% @doc Set the frag field of {@link uri()}.
+%% @spec(string()) -> uri()
+frag(Uri, NewFrag) ->
+    update_raw(Uri#uri{frag = NewFrag}).
+
+%% @doc Return the raw field of {@link uri()}.
+%% @spec(uri()) -> string()
+raw(#uri{raw = Raw}) ->
+    Raw.
+
+update_raw(Uri) ->
+    Uri#uri{raw = binary_to_list(iolist_to_binary(to_iolist(Uri)))}.
+
+to_iolist(Uri) ->
+    [Uri#uri.scheme, <<"://">>, user_info_to_string(Uri), Uri#uri.host,
+     port_to_string(Uri), path_to_string(Uri), raw_query_to_string(Uri),
+     frag_to_string(Uri)].
