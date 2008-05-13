@@ -293,7 +293,9 @@ frag_to_string(#uri{frag = Frag}) ->
 %%      The string needent have to be from a uri, this method is also
 %%      useful for decoding the `Post' body of an HTTP form submission.
 %% @todo make a form of this that for keys specified multiple times, return
-%%       them as some kind of a list
+%%       them as some kind of a list. | Actually, maybe this should be pushed
+%%       to the tuple-list/dict libraries to support multiple values for a
+%%       single key.
 %% @spec(Query) -> dict().
 %%       Query = string() | uri()
 query_to_dict(Query) ->
