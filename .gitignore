@@ -1,4 +1,7 @@
-_build
 *.patch
 *~
 #*#
+.*
+ebin/*
+doc/*
+deps/*
