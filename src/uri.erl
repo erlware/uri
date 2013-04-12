@@ -94,16 +94,16 @@
 %% types
 %%============================================================================
 
--export_type([uri/0]).
+-export_type([t/0]).
 
--type uri() :: record(uri).
+-type t() :: record(uri).
 
 %%============================================================================
 %% API
 %%============================================================================
 
 %% @doc Populate a new uri record by parsing the string `Uri'
--spec from_string(string()) -> uri().
+-spec from_string(string()) -> t().
 from_string(Uri) ->
     {Scheme, Uri1} = parse_scheme(Uri),
 
@@ -118,13 +118,13 @@ from_string(Uri) ->
 
 %% @doc Return the string this uri represents. (Same as the `raw'
 %% field)
--spec to_string(uri()) -> string().
+-spec to_string(t()) -> string().
 to_string(#uri{raw = Raw}) ->
     Raw.
 
 %% @doc Populate a new #uri record by using `Scheme' and parsing
 %% `HostPort' string `Uri'
--spec from_http_1_1(string(), string(), string()) -> uri().
+-spec from_http_1_1(string(), string(), string()) -> t().
 from_http_1_1(Scheme, HostPort, Uri) ->
     {Host, Port} = parse_host_port(HostPort),
     {Path, Uri1} = parse_path(Uri),
@@ -137,7 +137,7 @@ from_http_1_1(Scheme, HostPort, Uri) ->
 %%
 %% You probably want {@link raw/7} unless you've parsed a uri yourself.
 -spec new(string(), string(), string(), integer(), string(),
-          string(), string(), string()) -> uri().
+          string(), string(), string()) -> t().
 new(Scheme, UserInfo, Host, Port, Path, Query, Frag, Uri) ->
     update_raw(#uri{scheme = Scheme,
                     user_info = unquote(UserInfo),
@@ -151,7 +151,7 @@ new(Scheme, UserInfo, Host, Port, Path, Query, Frag, Uri) ->
 %% @doc Return a uri record with the given fields. Use `""' for any field
 %% that isn't used.
 -spec new(string(), string(), string(), integer(), string(),
-          string(), string()) -> uri().
+          string(), string()) -> t().
 new(Scheme, UserInfo, Host, Port, Path, Query, Frag) ->
     update_raw(#uri{scheme = Scheme,
                     user_info = unquote(UserInfo),
@@ -161,7 +161,7 @@ new(Scheme, UserInfo, Host, Port, Path, Query, Frag) ->
                     raw_query = Query,
                     frag = unquote(Frag)}).
 
-%% @doc Convert the string or the `raw_query' portion of {@link uri()} into
+%% @doc Convert the string or the `raw_query' portion of {@link t()} into
 %%      a dictionary, where the keys are strings, the values are strings,
 %%      and for valueless keys, the atom `true' is used as the value.
 %%
@@ -180,18 +180,18 @@ new(Scheme, UserInfo, Host, Port, Path, Query, Frag) ->
 %%       to the tuple-list/dict libraries to support multiple values for a
 %%       single key.
 %% @spec(Query) -> dict().
-%%       Query = string() | uri()
+%%       Query = string() | t()
 query_to_dict(Query) ->
     query_foldl(fun ({K, V}, D) -> dict:store(K, V, D) end, dict:new(), Query).
 
-%% @doc Convert the string or the `raw_query' portion of {@link uri()} into
+%% @doc Convert the string or the `raw_query' portion of {@link t()} into
 %%      a tuple-list. See {@link query_to_dict/1} for more information, this
 %%      is basically the same except that for duplicate keys,
 %%      {@link query_to_dict/1} will currently overwrite earlier values where
 %%      this will return a tuple-list with multiple key entries.
 %% @see query_to_dict/1
 %% @spec(Query) -> dict().
-%%       Query = string() | uri()
+%%       Query = string() | t()
 query_to_tl(Query) ->
     lists:reverse(query_foldl(fun (KV, Acc) -> [KV | Acc] end, [], Query)).
 
@@ -202,7 +202,7 @@ query_to_tl(Query) ->
 %%      Both `Key' and `Value' are already unquoted when `F' is called.
 %% @see query_to_dict/1
 %% @spec(F::function(), term(), Query) -> term().
-%%       Query = string() | uri()
+%%       Query = string() | t()
 query_foldl(F, Init, #uri{raw_query = Query}) ->
     query_foldl(F, Init, Query);
 query_foldl(F, Init, Query) ->
@@ -299,78 +299,78 @@ quote(Str, Part) ->
                                       [escape_for_part(C, Part) | Acc]
                               end, [], Str)).
 
-%% @doc Return the scheme field of {@link uri()}.
-%% @spec(uri()) -> string()
+%% @doc Return the scheme field of {@link t()}.
+%% @spec(t()) -> string()
 scheme(#uri{scheme = Scheme}) ->
     Scheme.
 
-%% @doc Set the scheme field of {@link uri()}.
-%% @spec(string()) -> uri()
+%% @doc Set the scheme field of {@link t()}.
+%% @spec(string()) -> t()
 scheme(Uri, NewScheme) ->
     update_raw(Uri#uri{scheme = NewScheme}).
 
-%% @doc Return the user_info field of {@link uri()}.
-%% @spec(uri()) -> string()
+%% @doc Return the user_info field of {@link t()}.
+%% @spec(t()) -> string()
 user_info(#uri{user_info = UserInfo}) ->
     UserInfo.
 
-%% @doc Set the user_info field of {@link uri()}.
-%% @spec(string()) -> uri()
+%% @doc Set the user_info field of {@link t()}.
+%% @spec(string()) -> t()
 user_info(Uri, NewUserInfo) ->
     update_raw(Uri#uri{user_info = NewUserInfo}).
 
-%% @doc Return the host field of {@link uri()}.
-%% @spec(uri()) -> string()
+%% @doc Return the host field of {@link t()}.
+%% @spec(t()) -> string()
 host(#uri{host = Host}) ->
     Host.
 
-%% @doc Set the host field of {@link uri()}.
-%% @spec(string()) -> uri()
+%% @doc Set the host field of {@link t()}.
+%% @spec(string()) -> t()
 host(Uri, NewHost) ->
     update_raw(Uri#uri{host = NewHost}).
 
-%% @doc Return the port field of {@link uri()}.
-%% @spec(uri()) -> integer()
+%% @doc Return the port field of {@link t()}.
+%% @spec(t()) -> integer()
 port(#uri{port = Port}) ->
     Port.
 
-%% @doc Set the port field of {@link uri()}.
-%% @spec(integer()) -> uri()
+%% @doc Set the port field of {@link t()}.
+%% @spec(integer()) -> t()
 port(Uri, NewPort) ->
     update_raw(Uri#uri{port = NewPort}).
 
-%% @doc Return the path field of {@link uri()}.
-%% @spec(uri()) -> string()
+%% @doc Return the path field of {@link t()}.
+%% @spec(t()) -> string()
 path(#uri{path = Path}) ->
     Path.
 
-%% @doc Set the path field of {@link uri()}.
-%% @spec(string()) -> uri()
+%% @doc Set the path field of {@link t()}.
+%% @spec(string()) -> t()
 path(Uri, NewPath) ->
     update_raw(Uri#uri{path = NewPath}).
 
-%% @doc Return the raw_query field of {@link uri()}.
-%% @spec(uri()) -> string()
+%% @doc Return the raw_query field of {@link t()}.
+%% @spec(t()) -> string()
 raw_query(#uri{raw_query = RawQuery}) ->
     RawQuery.
 
-%% @doc Set the raw_query field of {@link uri()}.
-%% @spec(string()) -> uri()
+%% @doc Set the raw_query field of {@link t()}.
+%% @spec(string()) -> t()
 raw_query(Uri, NewRawQuery) ->
     update_raw(Uri#uri{raw_query = NewRawQuery}).
 
-%% @doc Return the frag field of {@link uri()}.
-%% @spec(uri()) -> string()
+%% @doc Return the frag field of {@link t()}.
+%% @spec(t()) -> string()
 frag(#uri{frag = Frag}) ->
     Frag.
 
-%% @doc Set the frag field of {@link uri()}.
-%% @spec(string()) -> uri()
+%% @doc Set the frag field of {@link t()}.
+%% @spec(string()) -> t()
 frag(Uri, NewFrag) ->
     update_raw(Uri#uri{frag = NewFrag}).
 
-%% @doc Return the raw field of {@link uri()}.
-%% @spec(uri()) -> string()
+%% @doc Return the raw field of {@link t()}.
+%% @spec(t()) -> string()
 raw(#uri{raw = Raw}) ->
     Raw.
 
