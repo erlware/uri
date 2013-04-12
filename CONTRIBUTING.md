@@ -76,11 +76,11 @@ You SHOULD use these commands both before working on your patch and before
 submitting the pull request. If conflicts arise it is your responsability
 to deal with them.
 
-You MUST update `master` to `upstream` before doing anything. Then create a
-new branch `$BRANCH` and switch to it.
+You MUST create a new branch for your work. First make sure you have
+'fetched' `master`
 
 ``` bash
-$ git checkout -b $BRANCH
+$ git checkout -b $BRANCH upstream/master
 ```
 
 You MUST use a an insightful branch name.
