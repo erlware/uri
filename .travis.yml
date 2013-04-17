@@ -14,5 +14,4 @@ branches:
     - master
 notifications:
   email:
-    - core@erlware.org
-  irc: "irc.freenode.org#erlware"
+    - unlinkat@gmail.com
