@@ -136,7 +136,7 @@ from_http_1_1(Scheme, HostPort, Uri) ->
 %% that isn't used.
 %%
 %% You probably want {@link raw/7} unless you've parsed a uri yourself.
--spec new(string(), string(), string(), integer(), string(),
+-spec new(string(), string(), string(), integer() | undefined, string(),
           string(), string(), string()) -> t().
 new(Scheme, UserInfo, Host, Port, Path, Query, Frag, Uri) ->
     update_raw(#uri{scheme = Scheme,
@@ -150,7 +150,7 @@ new(Scheme, UserInfo, Host, Port, Path, Query, Frag, Uri) ->
 
 %% @doc Return a uri record with the given fields. Use `""' for any field
 %% that isn't used.
--spec new(string(), string(), string(), integer(), string(),
+-spec new(string(), string(), string(), integer() | undefined, string(),
           string(), string()) -> t().
 new(Scheme, UserInfo, Host, Port, Path, Query, Frag) ->
     update_raw(#uri{scheme = Scheme,
@@ -412,7 +412,7 @@ parse_user_info([C | HostPort], Acc) ->
 
 parse_host_port(HostPort) ->
     case string:tokens(HostPort, ":") of
-        [Host] -> {Host, ""};
+        [Host] -> {Host, undefined};
         [Host, Port] -> {Host, list_to_integer(Port)};
         _ -> throw({uri_error, {invalid_host_port, HostPort}})
     end.
@@ -574,6 +574,12 @@ new_test() ->
                  to_string(new("http", "", "myhost.com", 8080, "/my/path",
                                "color=red", "Section 5"))).
 
+from_string_test() ->
+    ?assertEqual(new("http", "", "example.com", undefined, "", "", ""),
+                 from_string("http://example.com")),
+    ?assertEqual(new("http", "user", "test.com", 8080, "/path", "q=test", "S"),
+                 from_string("http://user@test.com:8080/path?q=test#S")).
+
 parse_scheme_test() ->
     ?assertMatch({"http", "//test.com/"}, parse_scheme("http://test.com/")),
     ?assertMatch({"", "/test"}, parse_scheme("/test")),
@@ -590,7 +596,7 @@ parse_user_info_test() ->
 
 parse_host_port_test() ->
     ?assertMatch({"test.com", 8080}, parse_host_port("test.com:8080")),
-    ?assertMatch({"test.com", ""}, parse_host_port("test.com")).
+    ?assertMatch({"test.com", undefined}, parse_host_port("test.com")).
 
 parse_path_test() ->
     ?assertMatch({"/a/b/c", ""}, parse_path("/a/b/c")),
