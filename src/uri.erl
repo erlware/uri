@@ -413,8 +413,7 @@ parse_user_info([C | HostPort], Acc) ->
 parse_host_port(HostPort) ->
     case string:tokens(HostPort, ":") of
         [Host] -> {Host, undefined};
-        [Host, Port] -> {Host, list_to_integer(Port)};
-        _ -> throw({uri_error, {invalid_host_port, HostPort}})
+        [Host, Port] -> {Host, list_to_integer(Port)}
     end.
 
 parse_path(Uri) ->
