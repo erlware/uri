@@ -587,6 +587,7 @@ parse_scheme_test() ->
 parse_authority_test() ->
     ?assertMatch({"test.com", "/here"}, parse_authority("//test.com/here")),
     ?assertMatch({"test.com", ""}, parse_authority("//test.com")),
+    ?assertMatch("test.com", parse_authority("test.com")),
     ?assertMatch({"", "/test"}, parse_scheme("/test")).
 
 parse_user_info_test() ->
@@ -608,6 +609,12 @@ parse_query_test() ->
     ?assertMatch({"a=b", "#anchor"}, parse_query("?a=b#anchor")),
     ?assertMatch({"", "#anchor"}, parse_query("#anchor")),
     ?assertMatch({"", ""}, parse_query("")).
+
+parse_frag_test() ->
+    ?assertEqual("Test", parse_frag("#Test")),
+    ?assertEqual("Section 5", parse_frag("#Section%205")),
+    ?assertEqual("", parse_frag("")),
+    ?assertThrow({uri_error, {data_left_after_parsing, _}}, parse_frag("Test")).
 
 query_to_tl_test() ->
     ?assertMatch([{"a", true}, {"b", "c"}], query_to_tl("a&b=c")).
