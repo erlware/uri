@@ -33,9 +33,15 @@
          port/1, port/2, path/1, path/2, raw_query/1, raw_query/2,
          frag/1, frag/2, raw/1]).
 
--include_lib("eunit/include/eunit.hrl").
-
-%% @doc  This is a record that represents the different parts of a uri,
+%% @type uri() = #uri{scheme = string(),
+%%                    user_info = string(),
+%%                    host = string(),
+%%                    port = undefined | integer(),
+%%                    raw_query = iolist(),
+%%                    frag = string(),
+%%                    raw = string()}.
+%%
+%%       This is a record that represents the different parts of a uri,
 %%       as defined by rfc-2396. It has the following fields:
 %%       <dl>
 %%        <dt>scheme::string()</dt>
@@ -91,7 +97,7 @@
              }).
 
 %%============================================================================
-%% types
+%% Types
 %%============================================================================
 
 -export_type([t/0]).
