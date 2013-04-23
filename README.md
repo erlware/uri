@@ -1,7 +1,7 @@
 URI
 ===
 
-[![Build Status](https://travis-ci.org/erlware/uri.png)](https://travis-ci.org/erlware/uri)
+[![Build Status](https://travis-ci.org/asv/uri.png)](https://travis-ci.org/asv/uri)
 
 A module for generating, parsing, encoding, and decoding uris.
 At the moment this module isn't very sympathetic to non-http

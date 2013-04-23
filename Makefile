@@ -75,7 +75,7 @@ dialyzer: $(DEPS_PLT)
 typer:
 	typer --plt $(DEPS_PLT) -r ./src
 
-shell: get-deps compile
+shell: deps compile
 # You often want *rebuilt* rebar tests to be available to the
 # shell you have to call eunit (to get the tests
 # rebuilt). However, eunit runs the tests, which probably
@@ -97,4 +97,4 @@ distclean: clean
 	- rm -rf $(DEPS_PLT)
 	- rm -rvf $(CURDIR)/deps
 
-rebuild: distclean deps compile escript dialyzer test
+rebuild: distclean deps compile dialyzer test

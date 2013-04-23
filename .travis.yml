@@ -8,11 +8,10 @@ otp_release:
   - R14B04
   - R14B03
   - R14B02
-script: "make rebuild"
+script: "make test"
 branches:
   only:
     - master
 notifications:
   email:
-    - core@erlware.org
-  irc: "irc.freenode.org#erlware"
+    - unlinkat@gmail.com
