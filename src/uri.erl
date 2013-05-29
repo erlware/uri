@@ -30,7 +30,7 @@
          quote/1, quote/2,
          unquote/1,
          scheme/1, scheme/2, user_info/1, user_info/2, host/1, host/2,
-         port/1, port/2, path/1, path/2, raw_query/1, raw_query/2,
+         port/1, port/2, path/1, path/2, append_path/2, raw_query/1, raw_query/2,
          frag/1, frag/2, raw/1]).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -341,6 +341,10 @@ path(#uri{path = Path}) ->
 -spec path(t(), string()) -> t().
 path(Uri, NewPath) ->
     update_raw(Uri#uri{path = NewPath}).
+%% @doc Append a path to the existing path of the system
+-spec append_path(t(), string()) -> t().
+append_path(Uri=#uri{path=Path}, NewPath) ->
+    path(Uri, lists:flatten([Path, "/", NewPath])).
 
 %% @doc Return the raw_query field of {@link t()}.
 -spec raw_query(t()) -> string().
@@ -569,6 +573,13 @@ new_test() ->
     ?assertMatch("http://myhost.com:8080/my/path?color=red#Section%205",
                  to_string(new("http", "", "myhost.com", 8080, "/my/path",
                                "color=red", "Section 5"))).
+
+append_path_test() ->
+    T0 = new("http", "", "myhost.com", 8080, "/my/path", "color=red", "Section 5"),
+    T1 = append_path(T0, "additional/path"),
+    ?assertMatch("http://myhost.com:8080/my/path/additional/path?color=red#Section%205",
+                 to_string(T1)).
+
 
 parse_scheme_test() ->
     ?assertMatch({"http", "//test.com/"}, parse_scheme("http://test.com/")),
