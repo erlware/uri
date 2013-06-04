@@ -1,33 +1,11 @@
 # Copyright 2012 Erlware, LLC. All Rights Reserved.
 #
-# This file is provided to you under the Apache License,
-# Version 2.0 (the "License"); you may not use this file
-# except in compliance with the License.  You may obtain
-# a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
-#
+# BSD License see COPYING
 
-
-ERLFLAGS= -pa $(CURDIR)/.eunit -pa $(CURDIR)/ebin -pa $(CURDIR)/deps/*/ebin
-
-DEPS_PLT=$(CURDIR)/.deps_plt
-
-# =============================================================================
-# Verify that the programs we need to run are installed on this system
-# =============================================================================
 ERL = $(shell which erl)
+ERL_VER = $(shell erl -eval 'erlang:display(erlang:system_info(otp_release)), halt().'  -noshell)
 
-ifeq ($(ERL),)
-$(error "Erlang not available on this system")
-endif
+ERLFLAGS= -pa $(CURDIR)/.eunit -pa $(CURDIR)/ebin -pa $(CURDIR)/*/ebin
 
 REBAR=$(shell which rebar)
 
@@ -35,47 +13,59 @@ ifeq ($(REBAR),)
 $(error "Rebar not available on this system")
 endif
 
-.PHONY: all compile doc clean test dialyzer typer shell distclean pdf \
-	update-deps clean-common-test-data rebuild
+URI_PLT=$(CURDIR)/.uri_plt
 
-all: deps compile dialyzer test
+.PHONY: all compile doc clean test shell distclean pdf get-deps rebuild dialyzer typer
 
-# =============================================================================
-# Rules to build the system
-# =============================================================================
+all: compile doc test
 
 deps:
-	$(REBAR) get-deps
-	$(REBAR) compile
+	$(REBAR) get-deps compile
 
-update-deps:
-	$(REBAR) update-deps
-	$(REBAR) compile
+get-deps:
+	$(REBAR) get-deps compile
 
-compile:
+compile: deps
 	$(REBAR) skip_deps=true compile
 
-doc:
-	$(REBAR) skip_deps=true doc
+doc: compile
+	- $(REBAR) skip_deps=true doc
 
-eunit: compile clean-common-test-data
+test: compile
 	$(REBAR) skip_deps=true eunit
 
-test: compile eunit
-
-$(DEPS_PLT):
-	@echo Building local plt at $(DEPS_PLT)
+$(URI_PLT).$(ERL_VER).erts:
+	@echo Building local plt at $(URI_PLT).$(ERL_VER).base
 	@echo
-	dialyzer --output_plt $(DEPS_PLT) --build_plt \
-	   --apps erts kernel stdlib -r deps
 
-dialyzer: $(DEPS_PLT)
-	dialyzer --fullpath --plt $(DEPS_PLT) -Wrace_conditions -r ./ebin
+	- dialyzer --fullpath --verbose --output_plt $(URI_PLT).$(ERL_VER).base --build_plt \
+	   --apps erts
 
-typer:
-	typer --plt $(DEPS_PLT) -r ./src
+$(URI_PLT).$(ERL_VER).kernel:$(URI_PLT).$(ERL_VER).erts
+	@echo Building local plt at $(URI_PLT).$(ERL_VER).base
+	@echo
+	- dialyzer --fullpath --verbose --output_plt $(URI_PLT).$(ERL_VER).base --build_plt \
+	   --apps kernel
 
-shell: get-deps compile
+$(URI_PLT).$(ERL_VER).base:$(URI_PLT).$(ERL_VER).kernel
+	@echo Building local plt at $(URI_PLT).$(ERL_VER).base
+	@echo
+	- dialyzer --fullpath --verbose --output_plt $(URI_PLT).$(ERL_VER).base --build_plt \
+	   --apps stdlib
+
+$(URI_PLT).$(ERL_VER): $(URI_PLT).$(ERL_VER).base
+	@echo Building local plt at $(URI_PLT).$(ERL_VER)
+	@echo
+	- dialyzer --fullpath --verbose --output_plt $(URI_PLT).$(ERL_VER) --add_to_plt --plt $(URI_PLT).$(ERL_VER).base \
+	   --apps eunit -r deps
+
+dialyzer: $(URI_PLT).$(ERL_VER)
+	dialyzer --fullpath --plt $(URI_PLT).$(ERL_VER) -Wrace_conditions -r ./ebin
+
+typer: $(URI_PLT).$(ERL_VER)
+	typer --plt $(URI_PLT).$(ERL_VER) -r ./src
+
+shell: compile
 # You often want *rebuilt* rebar tests to be available to the
 # shell you have to call eunit (to get the tests
 # rebuilt). However, eunit runs the tests, which probably
@@ -84,17 +74,15 @@ shell: get-deps compile
 	- @$(REBAR) skip_deps=true eunit
 	@$(ERL) $(ERLFLAGS)
 
-pdf:
-	pandoc README.md -o README.pdf
-
 clean:
-	- rm -rf $(CURDIR)/test/*.beam
-	- rm -rf $(CURDIR)/logs
-	- rm -rf $(CURDIR)/ebin
 	$(REBAR) skip_deps=true clean
+	- rm $(CURDIR)/doc/*.html
+	- rm $(CURDIR)/doc/*.css
+	- rm $(CURDIR)/doc/*.png
+	- rm $(CURDIR)/doc/edoc-info
 
 distclean: clean
-	- rm -rf $(DEPS_PLT)
-	- rm -rvf $(CURDIR)/deps
+	rm -rf $(URI_PLT).$(ERL_VER)
+	rm -rvf $(CURDIR)/deps
 
-rebuild: distclean deps compile escript dialyzer test
+rebuild: distclean all
