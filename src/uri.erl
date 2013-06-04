@@ -79,15 +79,14 @@
 %%            in their browser, as this will most likely be formed by
 %%            concatenating the `Host' header with the `request' line uri.</dd>
 %%       </dl>
-
--record(uri, {scheme :: string(),       %% "http", "ftp"
-              user_info="" :: string(), %% [] | "srp"
-              host="" :: string(),      %% "somewhere.net"
-              port=undefined :: integer() | undefined,      %% undefined | 80 | 8080
-              path="" :: string(),      %% "/here/there/everytwhere"
-              raw_query="" :: iolist(), %% "id=12345&name=fred+johnson". undecoded.
-              frag="" :: string(),      %% "some anchor"
-              raw  :: string()          %% original raw uri
+-record(uri, {scheme :: string(),       % "http", "ftp"
+              user_info="" :: string(), % [] | "srp"
+              host="" :: string(),      % "somewhere.net"
+              port=undefined :: integer() | undefined,      % undefined | 80 | 8080
+              path="" :: string(),      % "/here/there/everytwhere"
+              raw_query="" :: iolist(), % "id=12345&name=fred+johnson". undecoded.
+              frag="" :: string(),      % "some anchor"
+              raw  :: string()          % original raw uri
              }).
 
 %%============================================================================
@@ -179,8 +178,7 @@ new(Scheme, UserInfo, Host, Port, Path, Query, Frag) ->
 %%       them as some kind of a list. | Actually, maybe this should be pushed
 %%       to the tuple-list/dict libraries to support multiple values for a
 %%       single key.
-%% @spec(Query) -> dict().
-%%       Query = string() | t()
+-spec query_to_dict(string() | t()) -> dict().
 query_to_dict(Query) ->
     query_foldl(fun ({K, V}, D) -> dict:store(K, V, D) end, dict:new(), Query).
 
@@ -190,8 +188,7 @@ query_to_dict(Query) ->
 %%      {@link query_to_dict/1} will currently overwrite earlier values where
 %%      this will return a tuple-list with multiple key entries.
 %% @see query_to_dict/1
-%% @spec(Query) -> dict().
-%%       Query = string() | t()
+-spec query_to_tl(string() | t()) -> proplists:proplist().
 query_to_tl(Query) ->
     lists:reverse(query_foldl(fun (KV, Acc) -> [KV | Acc] end, [], Query)).
 
@@ -201,8 +198,8 @@ query_to_tl(Query) ->
 %%      `F("range", "5-50", Acc)' and `F("printable", true, Acc)'.
 %%      Both `Key' and `Value' are already unquoted when `F' is called.
 %% @see query_to_dict/1
-%% @spec(F::function(), term(), Query) -> term().
-%%       Query = string() | t()
+-spec query_foldl(fun((proplists:property(), Acc::term()) -> term()),
+                  Acc, string() | t()) -> Acc.
 query_foldl(F, Init, #uri{raw_query = Query}) ->
     query_foldl(F, Init, Query);
 query_foldl(F, Init, Query) ->
@@ -215,15 +212,11 @@ query_foldl(F, Init, Query) ->
                         end
                 end, Init, string:tokens(iolist_to_string(Query), "&")).
 
-iolist_to_string(Str) ->
-    binary_to_list(iolist_to_binary(Str)).
-
-%% @doc Convert a dictionary or tuple-list to an iolist representing the
+%% @doc Convert a dictionary or proplist to an iolist representing the
 %% query part of a uri. Keys and values can be binaries, lists, atoms,
 %% integers or floats, and will be automatically converted to a string and
 %% quoted.
-%% @spec(KeyValues) -> iolist().
-%%     KeyValues = dict() | tuple_list().
+-spec to_query(dict() | proplists:proplist()) -> iolist().
 to_query({dict,_,_,_,_,_,_,_,_} = Dict) ->
     to_query(fun dict:fold/3, Dict);
 to_query(List) ->
@@ -234,7 +227,7 @@ to_query(List) ->
 %% take three arguments: a function, an initial accumulator value, and
 %% the datastructure to fold over.
 %% @see to_query/1
-%% @spec(function(), term()) -> iolist().
+-spec to_query(function(), term()) -> iolist().
 to_query(FoldF, Ds) ->
     string_join($&,
                 FoldF(fun ({K, V}, Acc) ->
@@ -246,7 +239,7 @@ to_query(FoldF, Ds) ->
 
 %% @doc Return `Str' with all `+' replaced with space, and `%NN' replaced
 %%      with the decoded byte.
-%% @spec(string()) -> string().
+-spec unquote(string()) -> string().
 unquote(Str) ->
     unquote(Str, []).
 
@@ -254,7 +247,7 @@ unquote(Str) ->
 %%      quoted form. For instance `"A Space"' becomes `"A%20Space"'.
 %%      This is the same as calling `quote(Str, any)'.
 %% @see quote/2
-%% @spec(string()) -> string().
+-spec quote(string()) -> string().
 quote(Str) ->
     quote(Str, any).
 
@@ -293,84 +286,84 @@ quote(Str) ->
 %%       <dt>frag</dt>
 %%       <dd>Quote for the fragment part of a uri</dd>
 %%      </dl>
-%% @spec(string(), atom()) -> string()
+-spec quote(string(), atom()) -> string().
 quote(Str, Part) ->
     lists:reverse(lists:foldl(fun (C, Acc) ->
                                       [escape_for_part(C, Part) | Acc]
                               end, [], Str)).
 
 %% @doc Return the scheme field of {@link t()}.
-%% @spec(t()) -> string()
+-spec scheme(t()) -> string().
 scheme(#uri{scheme = Scheme}) ->
     Scheme.
 
 %% @doc Set the scheme field of {@link t()}.
-%% @spec(string()) -> t()
+-spec scheme(t(), string()) -> t().
 scheme(Uri, NewScheme) ->
     update_raw(Uri#uri{scheme = NewScheme}).
 
 %% @doc Return the user_info field of {@link t()}.
-%% @spec(t()) -> string()
+-spec user_info(t()) -> string().
 user_info(#uri{user_info = UserInfo}) ->
     UserInfo.
 
 %% @doc Set the user_info field of {@link t()}.
-%% @spec(string()) -> t()
+-spec user_info(t(), string()) -> t().
 user_info(Uri, NewUserInfo) ->
     update_raw(Uri#uri{user_info = NewUserInfo}).
 
 %% @doc Return the host field of {@link t()}.
-%% @spec(t()) -> string()
+-spec host(t()) -> string().
 host(#uri{host = Host}) ->
     Host.
 
 %% @doc Set the host field of {@link t()}.
-%% @spec(string()) -> t()
+-spec host(t(), string()) -> t().
 host(Uri, NewHost) ->
     update_raw(Uri#uri{host = NewHost}).
 
 %% @doc Return the port field of {@link t()}.
-%% @spec(t()) -> integer()
+-spec port(t()) -> integer().
 port(#uri{port = Port}) ->
     Port.
 
 %% @doc Set the port field of {@link t()}.
-%% @spec(integer()) -> t()
+-spec port(t(), integer()) -> t().
 port(Uri, NewPort) ->
     update_raw(Uri#uri{port = NewPort}).
 
 %% @doc Return the path field of {@link t()}.
-%% @spec(t()) -> string()
+-spec path(t()) -> string().
 path(#uri{path = Path}) ->
     Path.
 
 %% @doc Set the path field of {@link t()}.
-%% @spec(string()) -> t()
+-spec path(t(), string()) -> t().
 path(Uri, NewPath) ->
     update_raw(Uri#uri{path = NewPath}).
 
 %% @doc Return the raw_query field of {@link t()}.
-%% @spec(t()) -> string()
+-spec raw_query(t()) -> string().
 raw_query(#uri{raw_query = RawQuery}) ->
     RawQuery.
 
 %% @doc Set the raw_query field of {@link t()}.
-%% @spec(string()) -> t()
+-spec raw_query(t(), string()) -> t().
 raw_query(Uri, NewRawQuery) ->
     update_raw(Uri#uri{raw_query = NewRawQuery}).
 
 %% @doc Return the frag field of {@link t()}.
-%% @spec(t()) -> string()
+-spec frag(t()) -> string().
 frag(#uri{frag = Frag}) ->
     Frag.
 
 %% @doc Set the frag field of {@link t()}.
-%% @spec(string()) -> t()
+-spec frag(t(), string()) -> t().
 frag(Uri, NewFrag) ->
     update_raw(Uri#uri{frag = NewFrag}).
 
 %% @doc Return the raw field of {@link t()}.
-%% @spec(t()) -> string()
+-spec raw(t()) -> string().
 raw(#uri{raw = Raw}) ->
     Raw.
 
@@ -561,6 +554,9 @@ to_iolist(Uri) ->
     [Uri#uri.scheme, <<"://">>, user_info_to_string(Uri), Uri#uri.host,
      port_to_string(Uri), path_to_string(Uri), raw_query_to_string(Uri),
      frag_to_string(Uri)].
+
+iolist_to_string(Str) ->
+    erlang:binary_to_list(erlang:iolist_to_binary(Str)).
 
 %%%===================================================================
 %%% Test Functions
