@@ -23,6 +23,8 @@
 %%% uri's, but that could/should change in the future.
 -module(uri).
 
+-compile(export_all).
+
 -export([new/7, new/8, from_string/1, from_http_1_1/3, to_string/1,
          query_foldl/3,
          query_to_dict/1, query_to_tl/1,
@@ -38,14 +40,14 @@
 %% @doc  This is a record that represents the different parts of a uri,
 %%       as defined by rfc-2396. It has the following fields:
 %%       <dl>
-%%        <dt>scheme::string()</dt>
+%%        <dt>scheme::binary()</dt>
 %%        <dd>`"http"', `"https"', `"ftp"', etc</dd>
 %%
-%%        <dt>user_info::string()</dt>
+%%        <dt>user_info::binary()</dt>
 %%        <dd>This will be `"parish:secret"' for the uri
 %%            `"http://parish:secret@somehost.com/index.html"'</dd>
 %%
-%%        <dt>host::string()</dt>
+%%        <dt>host::binary()</dt>
 %%        <dd>This will be `"somehost.com"' for the uri
 %%            `"http://somehost.com/index.html"'.</dd>
 %%
@@ -54,7 +56,7 @@
 %%            `"http://somehost.com:8080/index.html"', and `[]' for
 %%            uri `"http://somehost.com/index.html"'.</dd>
 %%
-%%        <dt>path::string()</dt>
+%%        <dt>path::binary()</dt>
 %%        <dd>This will be `"/index.html"' for the uri
 %%            `"http://somehost.com/index.html?startId=50"'. This will
 %%            be unquoted, so `"http://somehost.com/name+with%20spaces"'
@@ -66,27 +68,28 @@
 %%            or {@link query_to_dict/1}. The value will be the empty string
 %%            if no query was found in the uri.</dd>
 %%
-%%        <dt>frag::string()</dt>
+%%        <dt>frag::binary()</dt>
 %%        <dd>The fragment part of the url, unquoted. This will be
 %%            `"Section 5"' for the uri
 %%            `"http://somehost.com/index.html#Section+5"'. It will be
 %%            The empty string if no fragment is found.</dd>
 %%
-%%        <dt>raw::string()</dt>
+%%        <dt>raw::binary()</dt>
 %%        <dd>This is the original uri that the above fields were populated
 %%            from. Everything will still be in their original quoted form.
 %%            Note that this may be a best guess as to the uri a user had
 %%            in their browser, as this will most likely be formed by
 %%            concatenating the `Host' header with the `request' line uri.</dd>
 %%       </dl>
--record(uri, {scheme :: string(),       % "http", "ftp"
-              user_info="" :: string(), % [] | "srp"
-              host="" :: string(),      % "somewhere.net"
+%% @end
+-record(uri, {scheme ::  binary(),       % <<"http">>, <<"ftp">>
+              user_info="" :: binary(), % <<>> | <<"srp">>
+              host="" :: binary(),      % <<"somewhere.net">>
               port=undefined :: integer() | undefined,      % undefined | 80 | 8080
-              path="" :: string(),      % "/here/there/everytwhere"
-              raw_query="" :: iolist(), % "id=12345&name=fred+johnson". undecoded.
-              frag="" :: string(),      % "some anchor"
-              raw  :: string()          % original raw uri
+              path="" :: binary(),      % <<"/here/there/everytwhere">>
+              raw_query="" :: iolist(), % <<"id=12345&name=fred+johnson">>. undecoded.
+              frag="" :: binary(),      % <<"some anchor">>
+              raw  :: binary()          % original raw uri
              }).
 
 %%============================================================================
@@ -102,8 +105,12 @@
 %%============================================================================
 
 %% @doc Populate a new uri record by parsing the string `Uri'
--spec from_string(string()) -> t().
-from_string(Uri) ->
+-spec from_string(string() | binary()) -> t().
+from_string(Uri)
+  when erlang:is_list(Uri) ->
+    from_string(erlang:iolist_to_binary(Uri));
+from_string(Uri)
+  when erlang:is_binary(Uri) ->
     {Scheme, Uri1} = parse_scheme(Uri),
 
     {Authority, Uri2} = parse_authority(Uri1),
@@ -117,13 +124,13 @@ from_string(Uri) ->
 
 %% @doc Return the string this uri represents. (Same as the `raw'
 %% field)
--spec to_string(t()) -> string().
+-spec to_string(t()) -> binary().
 to_string(#uri{raw = Raw}) ->
     Raw.
 
 %% @doc Populate a new #uri record by using `Scheme' and parsing
 %% `HostPort' string `Uri'
--spec from_http_1_1(string(), string(), string()) -> t().
+-spec from_http_1_1(binary(), binary(), binary()) -> t().
 from_http_1_1(Scheme, HostPort, Uri) ->
     {Host, Port} = parse_host_port(HostPort),
     {Path, Uri1} = parse_path(Uri),
@@ -135,8 +142,8 @@ from_http_1_1(Scheme, HostPort, Uri) ->
 %% that isn't used.
 %%
 %% You probably want {@link raw/7} unless you've parsed a uri yourself.
--spec new(string(), string(), string(), integer(), string(),
-          string(), string(), string()) -> t().
+-spec new(binary(), binary(), binary(), integer() | undefined, binary(),
+          binary(), binary(), binary()) -> t().
 new(Scheme, UserInfo, Host, Port, Path, Query, Frag, Uri) ->
     update_raw(#uri{scheme = Scheme,
                     user_info = unquote(UserInfo),
@@ -149,8 +156,8 @@ new(Scheme, UserInfo, Host, Port, Path, Query, Frag, Uri) ->
 
 %% @doc Return a uri record with the given fields. Use `""' for any field
 %% that isn't used.
--spec new(string(), string(), string(), integer(), string(),
-          string(), string()) -> t().
+-spec new(binary(), binary(), binary(), integer(), binary(),
+          binary(), binary()) -> t().
 new(Scheme, UserInfo, Host, Port, Path, Query, Frag) ->
     update_raw(#uri{scheme = Scheme,
                     user_info = unquote(UserInfo),
@@ -178,7 +185,7 @@ new(Scheme, UserInfo, Host, Port, Path, Query, Frag) ->
 %%       them as some kind of a list. | Actually, maybe this should be pushed
 %%       to the tuple-list/dict libraries to support multiple values for a
 %%       single key.
--spec query_to_dict(string() | t()) -> dict().
+-spec query_to_dict(binary() | t()) -> dict().
 query_to_dict(Query) ->
     query_foldl(fun ({K, V}, D) -> dict:store(K, V, D) end, dict:new(), Query).
 
@@ -188,7 +195,7 @@ query_to_dict(Query) ->
 %%      {@link query_to_dict/1} will currently overwrite earlier values where
 %%      this will return a tuple-list with multiple key entries.
 %% @see query_to_dict/1
--spec query_to_tl(string() | t()) -> proplists:proplist().
+-spec query_to_tl(binary() | t()) -> proplists:proplist().
 query_to_tl(Query) ->
     lists:reverse(query_foldl(fun (KV, Acc) -> [KV | Acc] end, [], Query)).
 
@@ -199,18 +206,18 @@ query_to_tl(Query) ->
 %%      Both `Key' and `Value' are already unquoted when `F' is called.
 %% @see query_to_dict/1
 -spec query_foldl(fun((proplists:property(), Acc::term()) -> term()),
-                  Acc, string() | t()) -> Acc.
+                  Acc, binary() | t()) -> Acc.
 query_foldl(F, Init, #uri{raw_query = Query}) ->
     query_foldl(F, Init, Query);
 query_foldl(F, Init, Query) ->
     lists:foldl(fun (Part, Acc) ->
-                        case string:tokens(Part, "=") of
+                        case binary:split(Part, <<"=">>) of
                             [Key, Value] ->
                                 F({unquote(Key), unquote(Value)}, Acc);
                             [Key] ->
                                 F({unquote(Key), true}, Acc)
                         end
-                end, Init, string:tokens(iolist_to_string(Query), "&")).
+                end, Init, binary:split(erlang:iolist_to_binary(Query), <<"&">>)).
 
 %% @doc Convert a dictionary or proplist to an iolist representing the
 %% query part of a uri. Keys and values can be binaries, lists, atoms,
@@ -229,25 +236,35 @@ to_query(List) ->
 %% @see to_query/1
 -spec to_query(function(), term()) -> iolist().
 to_query(FoldF, Ds) ->
-    string_join($&,
-                FoldF(fun ({K, V}, Acc) ->
-                              [[quote(el_to_string(K), 'query'), $=,
-                                quote(el_to_string(V), 'query')] | Acc];
-                          (K, Acc) ->
-                              [quote(el_to_string(K), 'query') | Acc]
-                      end, [], Ds)).
+    FoldF(fun ({K, V}, <<>>) ->
+                  KB = quote(el_to_string(K), 'query'),
+                  VB = quote(el_to_string(V), 'query'),
+                  <<KB/binary, <<"=">>/binary,
+                    VB/binary>>;
+              ({K, V}, Acc) ->
+                  KB = quote(el_to_string(K), 'query'),
+                  VB = quote(el_to_string(V), 'query'),
+                  <<Acc/binary, $&, KB/binary, <<"=">>/binary,
+                    VB/binary>>;
+              (K, <<>>) ->
+                  KB = quote(el_to_string(K), 'query'),
+                  KB;
+              (K, Acc) ->
+                  KB = quote(el_to_string(K), 'query'),
+                  <<Acc/binary, $&, KB/binary>>
+              end, <<>>, Ds).
 
 %% @doc Return `Str' with all `+' replaced with space, and `%NN' replaced
 %%      with the decoded byte.
--spec unquote(string()) -> string().
+-spec unquote(binary()) -> binary().
 unquote(Str) ->
-    unquote(Str, []).
+    unquote(Str, <<>>).
 
 %% @doc Return `Str' with all reserved or uri-unsafe characters in
 %%      quoted form. For instance `"A Space"' becomes `"A%20Space"'.
 %%      This is the same as calling `quote(Str, any)'.
 %% @see quote/2
--spec quote(string()) -> string().
+-spec quote(binary()) -> binary().
 quote(Str) ->
     quote(Str, any).
 
@@ -286,39 +303,40 @@ quote(Str) ->
 %%       <dt>frag</dt>
 %%       <dd>Quote for the fragment part of a uri</dd>
 %%      </dl>
--spec quote(string(), atom()) -> string().
+-spec quote(binary(), atom()) -> binary().
 quote(Str, Part) ->
-    lists:reverse(lists:foldl(fun (C, Acc) ->
-                                      [escape_for_part(C, Part) | Acc]
-                              end, [], Str)).
+    binary_foldl(fun (C, Acc) ->
+                         Escaped = escape_for_part(C, Part),
+                         <<Acc/binary, Escaped/binary>>
+                 end, <<>>, Str).
 
 %% @doc Return the scheme field of {@link t()}.
--spec scheme(t()) -> string().
+-spec scheme(t()) -> binary().
 scheme(#uri{scheme = Scheme}) ->
     Scheme.
 
 %% @doc Set the scheme field of {@link t()}.
--spec scheme(t(), string()) -> t().
+-spec scheme(t(), binary()) -> t().
 scheme(Uri, NewScheme) ->
     update_raw(Uri#uri{scheme = NewScheme}).
 
 %% @doc Return the user_info field of {@link t()}.
--spec user_info(t()) -> string().
+-spec user_info(t()) -> binary().
 user_info(#uri{user_info = UserInfo}) ->
     UserInfo.
 
 %% @doc Set the user_info field of {@link t()}.
--spec user_info(t(), string()) -> t().
+-spec user_info(t(), binary()) -> t().
 user_info(Uri, NewUserInfo) ->
     update_raw(Uri#uri{user_info = NewUserInfo}).
 
 %% @doc Return the host field of {@link t()}.
--spec host(t()) -> string().
+-spec host(t()) -> binary().
 host(#uri{host = Host}) ->
     Host.
 
 %% @doc Set the host field of {@link t()}.
--spec host(t(), string()) -> t().
+-spec host(t(), binary()) -> t().
 host(Uri, NewHost) ->
     update_raw(Uri#uri{host = NewHost}).
 
@@ -333,41 +351,41 @@ port(Uri, NewPort) ->
     update_raw(Uri#uri{port = NewPort}).
 
 %% @doc Return the path field of {@link t()}.
--spec path(t()) -> string().
+-spec path(t()) -> binary().
 path(#uri{path = Path}) ->
     Path.
 
 %% @doc Set the path field of {@link t()}.
--spec path(t(), string()) -> t().
+-spec path(t(), binary()) -> t().
 path(Uri, NewPath) ->
     update_raw(Uri#uri{path = NewPath}).
 %% @doc Append a path to the existing path of the system
--spec append_path(t(), string()) -> t().
+-spec append_path(t(), binary()) -> t().
 append_path(Uri=#uri{path=Path}, NewPath) ->
-    path(Uri, lists:flatten([Path, "/", NewPath])).
+    path(Uri, <<Path/binary, <<"/">>/binary, NewPath/binary>>).
 
 %% @doc Return the raw_query field of {@link t()}.
--spec raw_query(t()) -> string().
+-spec raw_query(t()) -> binary().
 raw_query(#uri{raw_query = RawQuery}) ->
     RawQuery.
 
 %% @doc Set the raw_query field of {@link t()}.
--spec raw_query(t(), string()) -> t().
+-spec raw_query(t(), binary()) -> t().
 raw_query(Uri, NewRawQuery) ->
     update_raw(Uri#uri{raw_query = NewRawQuery}).
 
 %% @doc Return the frag field of {@link t()}.
--spec frag(t()) -> string().
+-spec frag(t()) -> binary().
 frag(#uri{frag = Frag}) ->
     Frag.
 
 %% @doc Set the frag field of {@link t()}.
--spec frag(t(), string()) -> t().
+-spec frag(t(), binary()) -> t().
 frag(Uri, NewFrag) ->
     update_raw(Uri#uri{frag = NewFrag}).
 
 %% @doc Return the raw field of {@link t()}.
--spec raw(t()) -> string().
+-spec raw(t()) -> binary().
 raw(#uri{raw = Raw}) ->
     Raw.
 
@@ -376,191 +394,245 @@ raw(#uri{raw = Raw}) ->
 %%============================================================================
 
 parse_scheme(Uri) ->
-    parse_scheme(Uri, []).
+    parse_scheme(Uri, <<>>).
 
-parse_scheme([$: | Uri], Acc) ->
-    {lists:reverse(Acc), Uri};
-parse_scheme([], Acc) ->
-    {[], lists:reverse(Acc)};
-parse_scheme([C | Rest], Acc) ->
-    parse_scheme(Rest, [C | Acc]).
+parse_scheme(<<$:, Uri/binary>>, Acc) ->
+    {Acc, Uri};
+parse_scheme(<<>>, Acc) ->
+    {<<>>, Acc};
+parse_scheme(<<C, Rest/binary>>, Acc) ->
+    parse_scheme(Rest, <<Acc/binary, C>>).
 
-parse_authority("//" ++ Uri) ->
-    parse_authority(Uri, "");
+parse_authority(<<$/, $/, Uri/binary>>) ->
+    parse_authority(Uri, <<"">>);
 parse_authority(Uri) ->
     Uri.
 
-parse_authority([$/ | Rest], Acc) ->
-    {lists:reverse(Acc), [$/ | Rest]};
-parse_authority([], Acc) ->
-    {lists:reverse(Acc), []};
-parse_authority([C | Rest], Acc) ->
-    parse_authority(Rest, [C | Acc]).
+parse_authority(<<$/, Rest/binary>>, Acc) ->
+    {Acc, <<$/, Rest/binary>>};
+parse_authority(<<>>, Acc) ->
+    {Acc, <<>>};
+parse_authority(<<C,  Rest/binary>>, Acc) ->
+    parse_authority(Rest, <<Acc/binary, C>>).
 
 parse_user_info(Authority) ->
-    parse_user_info(Authority, []).
+    parse_user_info(Authority, <<>>).
 
-parse_user_info([$@ | HostPort], Acc) ->
-    {lists:reverse(Acc), HostPort};
-parse_user_info([], Acc) ->
-    {[], lists:reverse(Acc)};
-parse_user_info([C | HostPort], Acc) ->
-    parse_user_info(HostPort, [C | Acc]).
+parse_user_info(<<$@, HostPort/binary>>, Acc) ->
+    {Acc, HostPort};
+parse_user_info(<<>>, Acc) ->
+    {<<>>, Acc};
+parse_user_info(<<C, HostPort/binary>>, Acc) ->
+    parse_user_info(HostPort, <<Acc/binary, C>>).
 
 parse_host_port(HostPort) ->
-    case string:tokens(HostPort, ":") of
-        [Host] -> {Host, ""};
-        [Host, Port] -> {Host, list_to_integer(Port)};
-        _ -> throw({uri_error, {invalid_host_port, HostPort}})
+    case binary:split(HostPort, <<":">>) of
+        [Host] ->
+            {Host, undefined};
+        [Host, <<>>] ->
+            {Host, undefined};
+        [Host, Port] ->
+            {Host, erlang:list_to_integer(erlang:binary_to_list(Port))};
+        _ ->
+            erlang:throw({uri_error, {invalid_host_port, HostPort}})
     end.
 
 parse_path(Uri) ->
-    parse_path(Uri, []).
+    parse_path(Uri, <<>>).
 
-parse_path([C | Uri], Acc) when C == $?; C == $# ->
-    {lists:reverse(Acc), [C | Uri]};
-parse_path([], Acc) ->
-    {lists:reverse(Acc), ""};
-parse_path([C | Uri], Acc) ->
-    parse_path(Uri, [C | Acc]).
+parse_path(<<C, Uri/binary>>, Acc)
+  when C == $?; C == $# ->
+    {Acc, <<C, Uri/binary>>};
+parse_path(<<>>, Acc) ->
+    {Acc, <<"">>};
+parse_path(<<C, Uri/binary>>, Acc) ->
+    parse_path(Uri, <<Acc/binary, C>>).
 
-
-parse_query([$? | Uri]) ->
-    parse_query(Uri, []);
+parse_query(<<$?, Uri/binary>>) ->
+    parse_query(Uri, <<>>);
 parse_query(Uri) ->
-    {"", Uri}.
+    {<<>>, Uri}.
 
-parse_query([$# | Uri], Acc) ->
-    {lists:reverse(Acc), [$# | Uri]};
-parse_query([], Acc) ->
-    {lists:reverse(Acc), ""};
-parse_query([C | Rest], Acc) ->
-    parse_query(Rest, [C | Acc]).
+parse_query(<<$#, Uri/binary>>, Acc) ->
+    {Acc, <<$#, Uri/binary>>};
+parse_query(<<>>, Acc) ->
+    {Acc, <<"">>};
+parse_query(<<C, Rest/binary>>, Acc) ->
+    parse_query(Rest, <<Acc/binary, C>>).
 
-
-parse_frag([$# | Frag]) ->
+parse_frag(<<$#, Frag/binary>>) ->
     unquote(Frag);
-parse_frag("") ->
-    "";
+parse_frag(<<>>) ->
+    <<>>;
 parse_frag(Data) ->
-    throw({uri_error, {data_left_after_parsing, Data}}).
+    erlang:throw({uri_error, {data_left_after_parsing, Data}}).
 
-user_info_to_string(#uri{user_info = ""}) ->
-    "";
+user_info_to_string(#uri{user_info = <<>>}) ->
+    <<>>;
 user_info_to_string(#uri{user_info = UserInfo}) ->
-    [UserInfo, $@].
+    <<UserInfo/binary, $@>>.
 
 port_to_string(#uri{port = undefined}) ->
-    "";
+    <<>>;
 port_to_string(#uri{port = Port}) ->
-    [$: | integer_to_list(Port)].
+    BPort = erlang:list_to_binary(erlang:integer_to_list(Port)),
+    <<$:, BPort/binary>>.
 
-path_to_string(#uri{path = ""}) ->
+path_to_string(#uri{path = <<>>}) ->
     $/;
 path_to_string(#uri{path = Path}) ->
     quote(Path, path).
 
-raw_query_to_string(#uri{raw_query = ""}) ->
-    "";
+raw_query_to_string(#uri{raw_query = <<>>}) ->
+    <<>>;
 raw_query_to_string(#uri{raw_query = RawQuery}) ->
-    [$? | RawQuery].
+    <<$?, RawQuery/binary>>.
 
-frag_to_string(#uri{frag = ""}) ->
-    "";
+frag_to_string(#uri{frag = <<>>}) ->
+    <<>>;
 frag_to_string(#uri{frag = Frag}) ->
-    [$#, quote(Frag, frag)].
+    BQuote = quote(Frag, frag),
+    <<$#, BQuote/binary>>.
 
-el_to_string(El) when is_atom(El) ->
-    atom_to_list(El);
-el_to_string(El) when is_number(El) ->
-    integer_to_list(El);
-el_to_string(El) when is_float(El) ->
-    float_to_list(El);
-el_to_string(El) ->
+el_to_string(El)
+  when erlang:is_atom(El) ->
+    erlang:iolist_to_binary(erlang:atom_to_list(El));
+el_to_string(El)
+  when erlang:is_integer(El) ->
+    erlang:iolist_to_binary(erlang:integer_to_list(El));
+el_to_string(El)
+  when erlang:is_float(El) ->
+    erlang:iolist_to_binary(erlang:float_to_list(El));
+el_to_string(El)
+  when erlang:is_list(El) ->
+    erlang:list_to_binary(El);
+el_to_string(El)
+  when erlang:is_binary(El) ->
     El.
 
-string_join(_, []) ->
-    "";
-string_join(_, [Str]) ->
-    Str;
-string_join(Join, List) ->
-    lists:foldl(fun (Str, Acc) -> [Str, Join | Acc] end, hd(List), tl(List)).
-
-unquote([], Acc) ->
-    lists:reverse(Acc);
-unquote([$+ | Str], Acc) ->
-    unquote(Str, [$  | Acc]);
-unquote([$\%, A, B | Str], Acc) ->
-    unquote(Str, [erlang:list_to_integer([A, B], 16) | Acc]);
-unquote([C | Str], Acc) ->
-    unquote(Str, [C | Acc]).
+unquote(<<>>, Acc) ->
+    Acc;
+unquote(<<$+, Str/binary>>, Acc) ->
+    unquote(Str, <<Acc/binary, $\s>>);
+unquote(<<$\%, A, B, Str/binary>>, Acc) ->
+    Char = erlang:list_to_integer([A, B], 16),
+    unquote(Str, <<Acc/binary, Char>>);
+unquote(<<C, Str/binary>>, Acc) ->
+    unquote(Str, <<Acc/binary, C/integer>>).
 
 escape_for_part(C, Part) ->
     IsReserved = case Part of
-                     any           -> is_unreserved(C);
-                     userinfo      -> is_userinfo(C);
-                     path          -> is_pchar(C) orelse C == $; orelse C == $/;
-                     segment       -> is_pchar(C) orelse C == $;;
-                     segment_param -> is_pchar(C);
-                     query_        -> is_unreserved(C);
-                     'query'       -> is_unreserved(C);
-                     fragment      -> is_unreserved(C);
-                     frag          -> is_unreserved(C)
+                     any ->
+                         is_unreserved(C);
+                     userinfo ->
+                         is_userinfo(C);
+                     path ->
+                         is_pchar(C) orelse C == $; orelse C == $/;
+                     segment ->
+                         is_pchar(C) orelse C == $;;
+                     segment_param ->
+                         is_pchar(C);
+                     query_ ->
+                         is_unreserved(C);
+                     'query' ->
+                         is_unreserved(C);
+                     fragment ->
+                         is_unreserved(C);
+                     frag ->
+                         is_unreserved(C)
                  end,
     case IsReserved of
-        true -> C;
-        false -> escape(C)
+        true ->
+            <<C>>;
+        false ->
+            escape(C)
     end.
 
 escape(C) ->
-    io_lib:format("%~2.16.0B", [C]).
+    erlang:iolist_to_binary(io_lib:format("%~2.16.0B", [C])).
 
-is_unreserved(C) -> is_alphanum(C) orelse is_mark(C).
-is_alphanum(C)   -> is_alpha(C) orelse is_digit(C).
-is_alpha(C)      -> is_lowalpha(C) orelse is_upalpha(C).
-is_lowalpha(C)   -> $a =< C andalso C =< $z.
-is_upalpha(C)    -> $A =< C andalso C =< $Z.
-is_digit(C)      -> $0 =< C andalso C =< $9.
+is_unreserved(C) ->
+    is_alphanum(C) orelse is_mark(C).
+is_alphanum(C) ->
+    is_alpha(C) orelse is_digit(C).
+is_alpha(C) ->
+    is_lowalpha(C) orelse is_upalpha(C).
+is_lowalpha(C) ->
+    $a =< C andalso C =< $z.
+is_upalpha(C) ->
+    $A =< C andalso C =< $Z.
+is_digit(C) ->
+    $0 =< C andalso C =< $9.
 
-is_pchar($:) -> true;
-is_pchar($@) -> true;
-is_pchar($&) -> true;
-is_pchar($=) -> true;
-is_pchar($+) -> true;
-is_pchar($$) -> true;
-is_pchar($,) -> true;
-is_pchar(C)  -> is_unreserved(C).
+is_pchar($:) ->
+    true;
+is_pchar($@) ->
+    true;
+is_pchar($&) ->
+    true;
+is_pchar($=) ->
+    true;
+is_pchar($+) ->
+    true;
+is_pchar($$) ->
+    true;
+is_pchar($,) ->
+    true;
+is_pchar(C)  ->
+    is_unreserved(C).
 
-is_userinfo($;) -> true;
-is_userinfo($:) -> true;
-is_userinfo($&) -> true;
-is_userinfo($=) -> true;
-is_userinfo($+) -> true;
-is_userinfo($$) -> true;
-is_userinfo($,) -> true;
-is_userinfo(C)  -> is_unreserved(C).
+is_userinfo($;) ->
+    true;
+is_userinfo($:) ->
+    true;
+is_userinfo($&) ->
+    true;
+is_userinfo($=) ->
+    true;
+is_userinfo($+) ->
+    true;
+is_userinfo($$) ->
+    true;
+is_userinfo($,) ->
+    true;
+is_userinfo(C)  ->
+    is_unreserved(C).
 
-is_mark($-) -> true;
-is_mark($_) -> true;
-is_mark($.) -> true;
-is_mark($!) -> true;
-is_mark($~) -> true;
-is_mark($*) -> true;
-is_mark($\') -> true;
-is_mark($() -> true;
-is_mark($)) -> true;
-is_mark(_) -> false.
+is_mark($-) ->
+    true;
+is_mark($_) ->
+    true;
+is_mark($.) ->
+    true;
+is_mark($!) ->
+    true;
+is_mark($~) ->
+    true;
+is_mark($*) ->
+    true;
+is_mark($\') ->
+    true;
+is_mark($() ->
+    true;
+is_mark($)) ->
+    true;
+is_mark(_) ->
+    false.
 
 update_raw(Uri) ->
-    Uri#uri{raw = iolist_to_string(to_iolist(Uri))}.
+    Uri#uri{raw = erlang:iolist_to_binary(to_iolist(Uri))}.
 
 to_iolist(Uri) ->
     [Uri#uri.scheme, <<"://">>, user_info_to_string(Uri), Uri#uri.host,
      port_to_string(Uri), path_to_string(Uri), raw_query_to_string(Uri),
      frag_to_string(Uri)].
 
-iolist_to_string(Str) ->
-    erlang:binary_to_list(erlang:iolist_to_binary(Str)).
+binary_foldl(_Fun, Acc0, <<>>) ->
+    Acc0;
+binary_foldl(Fun, Acc0, <<H, T/binary>>) ->
+    Acc1 = Fun(H, Acc0),
+    binary_foldl(Fun, Acc1, T).
+
 
 %%%===================================================================
 %%% Test Functions
@@ -570,65 +642,65 @@ iolist_to_string(Str) ->
 -include_lib("eunit/include/eunit.hrl").
 
 new_test() ->
-    ?assertMatch("http://myhost.com:8080/my/path?color=red#Section%205",
-                 to_string(new("http", "", "myhost.com", 8080, "/my/path",
-                               "color=red", "Section 5"))).
+    ?assertMatch(<<"http://myhost.com:8080/my/path?color=red#Section%205">>,
+                 to_string(new(<<"http">>, <<>>, <<"myhost.com">>, 8080, <<"/my/path">>,
+                               <<"color=red">>, <<"Section 5">>))).
 
 append_path_test() ->
-    T0 = new("http", "", "myhost.com", 8080, "/my/path", "color=red", "Section 5"),
-    T1 = append_path(T0, "additional/path"),
-    ?assertMatch("http://myhost.com:8080/my/path/additional/path?color=red#Section%205",
+    T0 = new(<<"http">>, <<"">>, <<"myhost.com">>, 8080,
+             <<"/my/path">>, <<"color=red">>, <<"Section 5">>),
+    T1 = append_path(T0, <<"additional/path">>),
+    ?assertMatch(<<"http://myhost.com:8080/my/path/additional/path?color=red#Section%205">>,
                  to_string(T1)).
 
-
 parse_scheme_test() ->
-    ?assertMatch({"http", "//test.com/"}, parse_scheme("http://test.com/")),
-    ?assertMatch({"", "/test"}, parse_scheme("/test")),
-    ?assertMatch({"mailto", "x@test.com"}, parse_scheme("mailto:x@test.com")).
+    ?assertMatch({<<"http">>, <<"//test.com/">>}, parse_scheme(<<"http://test.com/">>)),
+    ?assertMatch({<<>>, <<"/test">>}, parse_scheme(<<"/test">>)),
+    ?assertMatch({<<"mailto">>, <<"x@test.com">>}, parse_scheme(<<"mailto:x@test.com">>)).
 
 parse_authority_test() ->
-    ?assertMatch({"test.com", "/here"}, parse_authority("//test.com/here")),
-    ?assertMatch({"test.com", ""}, parse_authority("//test.com")),
-    ?assertMatch({"", "/test"}, parse_scheme("/test")).
+    ?assertMatch({<<"test.com">>, <<"/here">>}, parse_authority(<<"//test.com/here">>)),
+    ?assertMatch({<<"test.com">>, <<"">>}, parse_authority(<<"//test.com">>)),
+    ?assertMatch({<<>>, <<"/test">>}, parse_scheme(<<"/test">>)).
 
 parse_user_info_test() ->
-    ?assertMatch({"user", "test.com"}, parse_user_info("user@test.com")),
-    ?assertMatch({"", "user.test.com"}, parse_user_info("user.test.com")).
+    ?assertMatch({<<"user">>, <<"test.com">>}, parse_user_info(<<"user@test.com">>)),
+    ?assertMatch({<<"">>, <<"user.test.com">>}, parse_user_info(<<"user.test.com">>)).
 
 parse_host_port_test() ->
-    ?assertMatch({"test.com", 8080}, parse_host_port("test.com:8080")),
-    ?assertMatch({"test.com", ""}, parse_host_port("test.com")).
+    ?assertMatch({<<"test.com">>, 8080}, parse_host_port(<<"test.com:8080">>)),
+    ?assertMatch({<<"test.com">>, undefined}, parse_host_port(<<"test.com">>)).
 
 parse_path_test() ->
-    ?assertMatch({"/a/b/c", ""}, parse_path("/a/b/c")),
-    ?assertMatch({"/a/b/c", "?n=5"}, parse_path("/a/b/c?n=5")),
-    ?assertMatch({"/a/b/c", "#anchor"}, parse_path("/a/b/c#anchor")),
-    ?assertMatch({"", ""}, parse_path("")).
+    ?assertMatch({<<"/a/b/c">>, <<"">>}, parse_path(<<"/a/b/c">>)),
+    ?assertMatch({<<"/a/b/c">>, <<"?n=5">>}, parse_path(<<"/a/b/c?n=5">>)),
+    ?assertMatch({<<"/a/b/c">>, <<"#anchor">>}, parse_path(<<"/a/b/c#anchor">>)),
+    ?assertMatch({<<"">>, <<"">>}, parse_path(<<"">>)).
 
 parse_query_test() ->
-    ?assertMatch({"a=b", ""}, parse_query("?a=b")),
-    ?assertMatch({"a=b", "#anchor"}, parse_query("?a=b#anchor")),
-    ?assertMatch({"", "#anchor"}, parse_query("#anchor")),
-    ?assertMatch({"", ""}, parse_query("")).
+    ?assertMatch({<<"a=b">>, <<"">>}, parse_query(<<"?a=b">>)),
+    ?assertMatch({<<"a=b">>, <<"#anchor">>}, parse_query(<<"?a=b#anchor">>)),
+    ?assertMatch({<<"">>, <<"#anchor">>}, parse_query(<<"#anchor">>)),
+    ?assertMatch({<<"">>, <<"">>}, parse_query(<<"">>)).
 
 query_to_tl_test() ->
-    ?assertMatch([{"a", true}, {"b", "c"}], query_to_tl("a&b=c")).
+    ?assertMatch([{<<"a">>, true}, {<<"b">>, <<"c">>}], query_to_tl(<<"a&b=c">>)).
 
 to_query_test() ->
     ?assertMatch(
-       "one&two=2&three=two%20%2B%20one",
-       iolist_to_string(to_query([one, {"two", 2}, {"three", "two + one"}]))).
+       <<"one&two=2&three=two%20%2B%20one">>,
+       to_query([one, {<<"two">>, 2}, {<<"three">>, <<"two + one">>}])).
 
 unquote_test() ->
-    ?assertMatch("ab", unquote("ab")),
-    ?assertMatch("a b", unquote("a+b")),
-    ?assertMatch("a b", unquote("a%20b")).
+    ?assertMatch(<<"ab">>, unquote(<<"ab">>)),
+    ?assertMatch(<<"a b">>, unquote(<<"a+b">>)),
+    ?assertMatch(<<"a b">>, unquote(<<"a%20b">>)).
 
 quote_test() ->
-    ?assertMatch("abc123", lists:flatten(quote("abc123"))),
-    ?assertMatch("abc%20123", lists:flatten(quote("abc 123"))).
+    ?assertMatch(<<"abc123">>, quote(<<"abc123">>)),
+    ?assertMatch(<<"abc%20123">>, quote(<<"abc 123">>)).
 
 escape_test() ->
-    ?assertMatch("%20", lists:flatten(escape($ ))).
+    ?assertMatch(<<"%20">>, escape($\s)).
 
 -endif.
