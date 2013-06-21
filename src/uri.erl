@@ -87,7 +87,7 @@
               host="" :: binary(),      % <<"somewhere.net">>
               port=undefined :: integer() | undefined,      % undefined | 80 | 8080
               path="" :: binary(),      % <<"/here/there/everytwhere">>
-              raw_query="" :: iolist(), % <<"id=12345&name=fred+johnson">>. undecoded.
+              raw_query="" :: binary(), % <<"id=12345&name=fred+johnson">>. undecoded.
               frag="" :: binary(),      % <<"some anchor">>
               raw  :: binary()          % original raw uri
              }).
@@ -98,7 +98,7 @@
 
 -export_type([t/0]).
 
--type t() :: record(uri).
+-opaque t() :: record(uri).
 
 %%============================================================================
 %% API
@@ -136,7 +136,7 @@ from_http_1_1(Scheme, HostPort, Uri) ->
     {Path, Uri1} = parse_path(Uri),
     {Query, Uri2} = parse_query(Uri1),
     Frag = parse_frag(Uri2),
-    new(Scheme, "", Host, Port, Path, Query, Frag).
+    new(Scheme, <<"">>, Host, Port, Path, Query, Frag).
 
 %% @doc Return a uri record with the given fields. Use `""' for any field
 %% that isn't used.
@@ -223,7 +223,7 @@ query_foldl(F, Init, Query) ->
 %% query part of a uri. Keys and values can be binaries, lists, atoms,
 %% integers or floats, and will be automatically converted to a string and
 %% quoted.
--spec to_query(dict() | proplists:proplist()) -> iolist().
+-spec to_query(dict() | proplists:proplist()) -> binary().
 to_query({dict,_,_,_,_,_,_,_,_} = Dict) ->
     to_query(fun dict:fold/3, Dict);
 to_query(List) ->
@@ -234,7 +234,7 @@ to_query(List) ->
 %% take three arguments: a function, an initial accumulator value, and
 %% the datastructure to fold over.
 %% @see to_query/1
--spec to_query(function(), term()) -> iolist().
+-spec to_query(function(), term()) -> binary().
 to_query(FoldF, Ds) ->
     FoldF(fun ({K, V}, <<>>) ->
                   KB = quote(el_to_string(K), 'query'),

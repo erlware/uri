@@ -3,7 +3,7 @@
 # BSD License see COPYING
 
 ERL = $(shell which erl)
-ERL_VER = $(shell erl -eval 'erlang:display(erlang:system_info(otp_release)), halt().'  -noshell)
+ERL_VER=$(shell erl -eval 'io:format("~s~n", [erlang:system_info(otp_release)]), halt().'  -noshell)
 
 ERLFLAGS= -pa $(CURDIR)/.eunit -pa $(CURDIR)/ebin -pa $(CURDIR)/*/ebin
 
@@ -13,7 +13,7 @@ ifeq ($(REBAR),)
 $(error "Rebar not available on this system")
 endif
 
-URI_PLT=$(CURDIR)/.uri_plt
+URI_PLT=$(CURDIR)/.uri_plt.$(ERL_VER)
 
 .PHONY: all compile doc clean test shell distclean pdf get-deps rebuild dialyzer typer
 
@@ -34,36 +34,17 @@ doc: compile
 test: compile
 	$(REBAR) skip_deps=true eunit
 
-$(URI_PLT).$(ERL_VER).erts:
-	@echo Building local plt at $(URI_PLT).$(ERL_VER).base
+$(URI_PLT):
+	@echo Building local plt at $(URI_PLT)
 	@echo
+	- dialyzer --fullpath --verbose --output_plt $(URI_PLT) --build_plt \
+	   --apps erts kernel stdlib eunit -r deps
 
-	- dialyzer --fullpath --verbose --output_plt $(URI_PLT).$(ERL_VER).base --build_plt \
-	   --apps erts
+dialyzer: test $(URI_PLT)
+	dialyzer --fullpath --plt $(URI_PLT) -Wrace_conditions --src -r ./src
 
-$(URI_PLT).$(ERL_VER).kernel:$(URI_PLT).$(ERL_VER).erts
-	@echo Building local plt at $(URI_PLT).$(ERL_VER).base
-	@echo
-	- dialyzer --fullpath --verbose --output_plt $(URI_PLT).$(ERL_VER).base --build_plt \
-	   --apps kernel
-
-$(URI_PLT).$(ERL_VER).base:$(URI_PLT).$(ERL_VER).kernel
-	@echo Building local plt at $(URI_PLT).$(ERL_VER).base
-	@echo
-	- dialyzer --fullpath --verbose --output_plt $(URI_PLT).$(ERL_VER).base --build_plt \
-	   --apps stdlib
-
-$(URI_PLT).$(ERL_VER): $(URI_PLT).$(ERL_VER).base
-	@echo Building local plt at $(URI_PLT).$(ERL_VER)
-	@echo
-	- dialyzer --fullpath --verbose --output_plt $(URI_PLT).$(ERL_VER) --add_to_plt --plt $(URI_PLT).$(ERL_VER).base \
-	   --apps eunit -r deps
-
-dialyzer: $(URI_PLT).$(ERL_VER)
-	dialyzer --fullpath --plt $(URI_PLT).$(ERL_VER) -Wrace_conditions -r ./ebin
-
-typer: $(URI_PLT).$(ERL_VER)
-	typer --plt $(URI_PLT).$(ERL_VER) -r ./src
+typer: $(URI_PLT)
+	typer --plt $(URI_PLT) -r ./src
 
 shell: compile
 # You often want *rebuilt* rebar tests to be available to the
