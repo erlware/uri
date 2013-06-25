@@ -473,7 +473,12 @@ port_to_string(#uri{port = Port}) ->
 path_to_string(#uri{path = <<>>}) ->
     $/;
 path_to_string(#uri{path = Path}) ->
-    quote(Path, path).
+    case quote(Path, path) of
+        <<$/, _/binary>> ->
+            Path;
+        QuotedPath ->
+            <<$/, QuotedPath/binary>>
+    end.
 
 query_to_string(#uri{q = []}) ->
     <<"">>;
@@ -636,7 +641,7 @@ binary_foldl(Fun, Acc0, <<H, T/binary>>) ->
 
 new_test() ->
     ?assertMatch(<<"http://myhost.com:8080/my/path?color=red#Section%205">>,
-                 to_string(new(<<"http">>, <<>>, <<"myhost.com">>, 8080, <<"/my/path">>,
+                 to_string(new(<<"http">>, <<>>, <<"myhost.com">>, 8080, <<"my/path">>,
                                <<"color=red">>, <<"Section 5">>))).
 
 append_path_test() ->
