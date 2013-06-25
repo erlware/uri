@@ -25,14 +25,16 @@
 
 -compile(export_all).
 
--export([new/7, new/8, from_string/1, from_http_1_1/3, to_string/1,
+-export([new/7, from_string/1, from_http_1_1/3, to_string/1,
          query_foldl/3,
-         query_to_dict/1, query_to_tl/1,
+         query_to_proplist/1,
          to_query/1, to_query/2,
          quote/1, quote/2,
          unquote/1,
          scheme/1, scheme/2, user_info/1, user_info/2, host/1, host/2,
-         port/1, port/2, path/1, path/2, append_path/2, raw_query/1, raw_query/2,
+         port/1, port/2, path/1, path/2, append_path/2,
+         raw_query/1, raw_query/2,
+         q/1, q/2,
          frag/1, frag/2, raw/1]).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -62,11 +64,9 @@
 %%            be unquoted, so `"http://somehost.com/name+with%20spaces"'
 %%            will be `"/name with spaces"'</dd>
 %%
-%%        <dt>raw_query::iolist()</dt>
-%%        <dd>This is the not unquoted. Probably the most convient way to
-%%            access the query componant will be to use {@link query_to_tl/1}
-%%            or {@link query_to_dict/1}. The value will be the empty string
-%%            if no query was found in the uri.</dd>
+%%        <dt>q::dict()</dt>
+%%        <dd> This is a dict of name value pairs from the query. If no query
+%%             was found then it is left empty </dd>
 %%
 %%        <dt>frag::binary()</dt>
 %%        <dd>The fragment part of the url, unquoted. This will be
@@ -87,9 +87,9 @@
               host="" :: binary(),      % <<"somewhere.net">>
               port=undefined :: integer() | undefined,      % undefined | 80 | 8080
               path="" :: binary(),      % <<"/here/there/everytwhere">>
-              raw_query="" :: binary(), % <<"id=12345&name=fred+johnson">>. undecoded.
+              q=[] :: proplists:proplist(),  % The q as a dict
               frag="" :: binary(),      % <<"some anchor">>
-              raw  :: binary()          % original raw uri
+              raw= <<"">>  :: binary()          % original raw uri
              }).
 
 %%============================================================================
@@ -120,7 +120,7 @@ from_string(Uri)
     {Path, Uri3} = parse_path(Uri2),
     {Query, Uri4} = parse_query(Uri3),
     Frag = parse_frag(Uri4),
-    new(Scheme, UserInfo, Host, Port, Path, Query, Frag, Uri).
+    new(Scheme, UserInfo, Host, Port, Path, Query, Frag).
 
 %% @doc Return the string this uri represents. (Same as the `raw'
 %% field)
@@ -143,36 +143,28 @@ from_http_1_1(Scheme, HostPort, Uri) ->
 %%
 %% You probably want {@link raw/7} unless you've parsed a uri yourself.
 -spec new(binary(), binary(), binary(), integer() | undefined, binary(),
-          binary(), binary(), binary()) -> t().
-new(Scheme, UserInfo, Host, Port, Path, Query, Frag, Uri) ->
+          proplists:proplist() | binary(), binary()) ->
+                 t().
+new(Scheme, UserInfo, Host, Port, Path, Query, Frag)
+  when erlang:is_binary(Query) ->
+    new(Scheme, UserInfo, Host, Port, Path, query_to_proplist(Query), Frag);
+new(Scheme, UserInfo, Host, Port, Path, Query, Frag)
+when erlang:is_list(Query) ->
     update_raw(#uri{scheme = Scheme,
                     user_info = unquote(UserInfo),
                     host = Host,
                     port = Port,
                     path = unquote(Path),
-                    raw_query = Query,
-                    frag = unquote(Frag),
-                    raw = Uri}).
-
-%% @doc Return a uri record with the given fields. Use `""' for any field
-%% that isn't used.
--spec new(binary(), binary(), binary(), integer(), binary(),
-          binary(), binary()) -> t().
-new(Scheme, UserInfo, Host, Port, Path, Query, Frag) ->
-    update_raw(#uri{scheme = Scheme,
-                    user_info = unquote(UserInfo),
-                    host = Host,
-                    port = Port,
-                    path = unquote(Path),
-                    raw_query = Query,
+                    q = Query,
                     frag = unquote(Frag)}).
 
-%% @doc Convert the string or the `raw_query' portion of {@link t()} into
-%%      a dictionary, where the keys are strings, the values are strings,
-%%      and for valueless keys, the atom `true' is used as the value.
+%% @doc Convert the string or the `raw_query' portion of {@link t()} into a
+%%      {@link proplists:proplist()}, where the keys are binaries, the values
+%%      are binaries, and for valueless keys, the atom `true' is used as the
+%%      value.
 %%
 %%      For example, `"range=5-50&printable"' would result in the following
-%%      dictionary entries:
+%%      proplist entries:
 %%      <table>
 %%       <tr><th>Key</th><th>Value</th></tr>
 %%       <tr><td>"range"</td><td>"5-50"</td></tr>
@@ -181,22 +173,8 @@ new(Scheme, UserInfo, Host, Port, Path, Query, Frag) ->
 %%
 %%      The string needent have to be from a uri, this method is also
 %%      useful for decoding the `Post' body of an HTTP form submission.
-%% @todo make a form of this that for keys specified multiple times, return
-%%       them as some kind of a list. | Actually, maybe this should be pushed
-%%       to the tuple-list/dict libraries to support multiple values for a
-%%       single key.
--spec query_to_dict(binary() | t()) -> dict().
-query_to_dict(Query) ->
-    query_foldl(fun ({K, V}, D) -> dict:store(K, V, D) end, dict:new(), Query).
-
-%% @doc Convert the string or the `raw_query' portion of {@link t()} into
-%%      a tuple-list. See {@link query_to_dict/1} for more information, this
-%%      is basically the same except that for duplicate keys,
-%%      {@link query_to_dict/1} will currently overwrite earlier values where
-%%      this will return a tuple-list with multiple key entries.
-%% @see query_to_dict/1
--spec query_to_tl(binary() | t()) -> proplists:proplist().
-query_to_tl(Query) ->
+-spec query_to_proplist(binary()) -> proplists:proplist().
+query_to_proplist(Query) ->
     lists:reverse(query_foldl(fun (KV, Acc) -> [KV | Acc] end, [], Query)).
 
 
@@ -206,10 +184,11 @@ query_to_tl(Query) ->
 %%      Both `Key' and `Value' are already unquoted when `F' is called.
 %% @see query_to_dict/1
 -spec query_foldl(fun((proplists:property(), Acc::term()) -> term()),
-                  Acc, binary() | t()) -> Acc.
-query_foldl(F, Init, #uri{raw_query = Query}) ->
+                  Acc, proplists:proplist() | binary() | t()) -> Acc.
+query_foldl(F, Init, #uri{q = Query}) ->
     query_foldl(F, Init, Query);
-query_foldl(F, Init, Query) ->
+query_foldl(F, Init, Query)
+  when erlang:is_binary(Query) ->
     lists:foldl(fun (Part, Acc) ->
                         case binary:split(Part, <<"=">>) of
                             [Key, Value] ->
@@ -217,40 +196,42 @@ query_foldl(F, Init, Query) ->
                             [Key] ->
                                 F({unquote(Key), true}, Acc)
                         end
-                end, Init, binary:split(erlang:iolist_to_binary(Query), <<"&">>)).
+                end, Init, binary:split(erlang:iolist_to_binary(Query), <<"&">>));
+query_foldl(F, Init, Query)
+  when erlang:is_list(Query) ->
+    lists:foldl(F, Init, Query).
+
 
 %% @doc Convert a dictionary or proplist to an iolist representing the
 %% query part of a uri. Keys and values can be binaries, lists, atoms,
 %% integers or floats, and will be automatically converted to a string and
 %% quoted.
--spec to_query(dict() | proplists:proplist()) -> binary().
-to_query({dict,_,_,_,_,_,_,_,_} = Dict) ->
-    to_query(fun dict:fold/3, Dict);
-to_query(List) ->
+to_query(List)
+  when erlang:is_list(List) ->
     to_query(fun lists:foldl/3, List).
 
-%% @doc Return an iolist representing the query part of a uri by
+%% @doc Return an binary representing the query part of a uri by
 %% folding over `Ds' by calling the provided `FoldF', which should
 %% take three arguments: a function, an initial accumulator value, and
 %% the datastructure to fold over.
 %% @see to_query/1
--spec to_query(function(), term()) -> binary().
+-spec to_query(function(), binary() | proplist:proplist()) -> binary().
 to_query(FoldF, Ds) ->
     FoldF(fun ({K, V}, <<>>) ->
-                  KB = quote(el_to_string(K), 'query'),
-                  VB = quote(el_to_string(V), 'query'),
+                  KB = quote(el_to_string(K), q),
+                  VB = quote(el_to_string(V), q),
                   <<KB/binary, <<"=">>/binary,
                     VB/binary>>;
               ({K, V}, Acc) ->
-                  KB = quote(el_to_string(K), 'query'),
-                  VB = quote(el_to_string(V), 'query'),
+                  KB = quote(el_to_string(K), q),
+                  VB = quote(el_to_string(V), q),
                   <<Acc/binary, $&, KB/binary, <<"=">>/binary,
                     VB/binary>>;
               (K, <<>>) ->
-                  KB = quote(el_to_string(K), 'query'),
+                  KB = quote(el_to_string(K), q),
                   KB;
               (K, Acc) ->
-                  KB = quote(el_to_string(K), 'query'),
+                  KB = quote(el_to_string(K), q),
                   <<Acc/binary, $&, KB/binary>>
               end, <<>>, Ds).
 
@@ -293,12 +274,12 @@ quote(Str) ->
 %%           of uris). This is like `path' but will also quote the characters
 %%           `/' and `;'.</dd>
 %%
-%%       <dt>query_ | 'query'</dt>
+%%       <dt>query_ | q</dt>
 %%       <dd>Quote for query parts. `query' is an erlang keyword so you can
-%%           either use `` 'query' '' or `query_' to specify this part. This
+%%           either use `` q '' or `query_' to specify this part. This
 %%           will quote characters such as `&' and `=', so it needs to be
 %%           called on the individual key/value parts of a query. See
-%%           {@link dict_to_query/1} and {@link tl_to_query/1}.</dd>
+%%           {@link to_query/1} and {@link to_query/1}.</dd>
 %%
 %%       <dt>frag</dt>
 %%       <dd>Quote for the fragment part of a uri</dd>
@@ -366,13 +347,24 @@ append_path(Uri=#uri{path=Path}, NewPath) ->
 
 %% @doc Return the raw_query field of {@link t()}.
 -spec raw_query(t()) -> binary().
-raw_query(#uri{raw_query = RawQuery}) ->
-    RawQuery.
+raw_query(#uri{q = Query}) ->
+    to_query(Query).
 
 %% @doc Set the raw_query field of {@link t()}.
 -spec raw_query(t(), binary()) -> t().
 raw_query(Uri, NewRawQuery) ->
-    update_raw(Uri#uri{raw_query = NewRawQuery}).
+    update_raw(Uri#uri{q = query_to_proplist(NewRawQuery)}).
+
+%% @doc Return the query field of {@link t()}.
+-spec q(t()) -> proplists:proplist().
+q(#uri{q = Query}) ->
+    Query.
+
+%% @doc Set the query field of {@link t()}.
+-spec q(t(), proplists:proplist()) -> t().
+q(Uri, Query)
+  when erlang:is_list(Query) ->
+    update_raw(Uri#uri{q = Query}).
 
 %% @doc Return the frag field of {@link t()}.
 -spec frag(t()) -> binary().
@@ -483,9 +475,10 @@ path_to_string(#uri{path = <<>>}) ->
 path_to_string(#uri{path = Path}) ->
     quote(Path, path).
 
-raw_query_to_string(#uri{raw_query = <<>>}) ->
-    <<>>;
-raw_query_to_string(#uri{raw_query = RawQuery}) ->
+query_to_string(#uri{q = []}) ->
+    <<"">>;
+query_to_string(#uri{q = Query}) ->
+    RawQuery = to_query(Query),
     <<$?, RawQuery/binary>>.
 
 frag_to_string(#uri{frag = <<>>}) ->
@@ -534,7 +527,7 @@ escape_for_part(C, Part) ->
                          is_pchar(C);
                      query_ ->
                          is_unreserved(C);
-                     'query' ->
+                     q ->
                          is_unreserved(C);
                      fragment ->
                          is_unreserved(C);
@@ -624,7 +617,7 @@ update_raw(Uri) ->
 
 to_iolist(Uri) ->
     [Uri#uri.scheme, <<"://">>, user_info_to_string(Uri), Uri#uri.host,
-     port_to_string(Uri), path_to_string(Uri), raw_query_to_string(Uri),
+     port_to_string(Uri), path_to_string(Uri), query_to_string(Uri),
      frag_to_string(Uri)].
 
 binary_foldl(_Fun, Acc0, <<>>) ->
@@ -683,13 +676,21 @@ parse_query_test() ->
     ?assertMatch({<<"">>, <<"#anchor">>}, parse_query(<<"#anchor">>)),
     ?assertMatch({<<"">>, <<"">>}, parse_query(<<"">>)).
 
-query_to_tl_test() ->
-    ?assertMatch([{<<"a">>, true}, {<<"b">>, <<"c">>}], query_to_tl(<<"a&b=c">>)).
+query_to_proplist_test() ->
+    ?assertMatch([{<<"a">>, true}, {<<"b">>, <<"c">>}], query_to_proplist(<<"a&b=c">>)).
 
 to_query_test() ->
     ?assertMatch(
        <<"one&two=2&three=two%20%2B%20one">>,
        to_query([one, {<<"two">>, 2}, {<<"three">>, <<"two + one">>}])).
+
+proplist_query_test() ->
+    QueryPropList = [{<<"foo">>, <<"bar">>}, {<<"baz">>, <<"back">>}],
+    Uri0 = from_string(<<"http://myhost.com:8080/my/path?color=red#Section%205">>),
+    Uri1 = q(Uri0, QueryPropList),
+    ?assertMatch(<<"http://myhost.com:8080/my/path?foo=bar&baz=back#Section%205">>,
+                     to_string(Uri1)).
+
 
 unquote_test() ->
     ?assertMatch(<<"ab">>, unquote(<<"ab">>)),
