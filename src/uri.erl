@@ -659,7 +659,7 @@ parse_scheme_test() ->
 parse_authority_test() ->
     ?assertMatch({<<"test.com">>, <<"/here">>}, parse_authority(<<"//test.com/here">>)),
     ?assertMatch({<<"test.com">>, <<"">>}, parse_authority(<<"//test.com">>)),
-    ?assertMatch({<<>>, <<"/test">>}, parse_scheme(<<"/test">>)).
+    ?assertMatch(<<"/test">>, parse_authority(<<"/test">>)).
 
 parse_user_info_test() ->
     ?assertMatch({<<"user">>, <<"test.com">>}, parse_user_info(<<"user@test.com">>)),
