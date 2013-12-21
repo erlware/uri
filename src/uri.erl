@@ -193,6 +193,8 @@ query_foldl(F, Init, Query)
                         case binary:split(Part, <<"=">>) of
                             [Key, Value] ->
                                 F({unquote(Key), unquote(Value)}, Acc);
+                            [<<>>] ->
+                                Acc;
                             [Key] ->
                                 F({unquote(Key), true}, Acc)
                         end
@@ -682,7 +684,11 @@ parse_query_test() ->
     ?assertMatch({<<"">>, <<"">>}, parse_query(<<"">>)).
 
 query_to_proplist_test() ->
-    ?assertMatch([{<<"a">>, true}, {<<"b">>, <<"c">>}], query_to_proplist(<<"a&b=c">>)).
+    ?assertMatch([], query_to_proplist(<<>>)),
+    ?assertMatch([{<<"a">>, <<"b">>}], query_to_proplist(<<"a=b&">>)),
+    ?assertMatch([{<<"a">>, <<>>}], query_to_proplist(<<"a=">>)),
+    ?assertMatch([{<<"a">>, true}, {<<"b">>, <<"c">>}], query_to_proplist(<<"a&b=c">>)),
+    ?assertMatch([{<<"a&b">>, <<"!t=f">>}], query_to_proplist(<<"a%26b=!t%3Df">>)).
 
 to_query_test() ->
     ?assertMatch(
