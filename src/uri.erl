@@ -39,49 +39,6 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
-%% @doc  This is a record that represents the different parts of a uri,
-%%       as defined by rfc-2396. It has the following fields:
-%%       <dl>
-%%        <dt>scheme::binary()</dt>
-%%        <dd>`"http"', `"https"', `"ftp"', etc</dd>
-%%
-%%        <dt>user_info::binary()</dt>
-%%        <dd>This will be `"parish:secret"' for the uri
-%%            `"http://parish:secret@somehost.com/index.html"'</dd>
-%%
-%%        <dt>host::binary()</dt>
-%%        <dd>This will be `"somehost.com"' for the uri
-%%            `"http://somehost.com/index.html"'.</dd>
-%%
-%%        <dt>port::integer() | undefined</dt>
-%%        <dd>This will be `8080' for the uri
-%%            `"http://somehost.com:8080/index.html"', and `[]' for
-%%            uri `"http://somehost.com/index.html"'.</dd>
-%%
-%%        <dt>path::binary()</dt>
-%%        <dd>This will be `"/index.html"' for the uri
-%%            `"http://somehost.com/index.html?startId=50"'. This will
-%%            be unquoted, so `"http://somehost.com/name+with%20spaces"'
-%%            will be `"/name with spaces"'</dd>
-%%
-%%        <dt>q::dict()</dt>
-%%        <dd> This is a dict of name value pairs from the query. If no query
-%%             was found then it is left empty </dd>
-%%
-%%        <dt>frag::binary()</dt>
-%%        <dd>The fragment part of the url, unquoted. This will be
-%%            `"Section 5"' for the uri
-%%            `"http://somehost.com/index.html#Section+5"'. It will be
-%%            The empty string if no fragment is found.</dd>
-%%
-%%        <dt>raw::binary()</dt>
-%%        <dd>This is the original uri that the above fields were populated
-%%            from. Everything will still be in their original quoted form.
-%%            Note that this may be a best guess as to the uri a user had
-%%            in their browser, as this will most likely be formed by
-%%            concatenating the `Host' header with the `request' line uri.</dd>
-%%       </dl>
-%% @end
 -record(uri, {scheme ::  binary(),       % <<"http">>, <<"ftp">>
               user_info="" :: binary(), % <<>> | <<"srp">>
               host="" :: binary(),      % <<"somewhere.net">>
@@ -98,7 +55,50 @@
 
 -export_type([t/0]).
 
--opaque t() :: record(uri).
+-opaque t() :: #uri{}.
+%%  This is a record that represents the different parts of a uri,
+%%  as defined by rfc-2396. It has the following fields:
+%%  <dl>
+%%   <dt>scheme::binary()</dt>
+%%   <dd>`"http"', `"https"', `"ftp"', etc</dd>
+%%
+%%   <dt>user_info::binary()</dt>
+%%   <dd>This will be `"parish:secret"' for the uri
+%%       `"http://parish:secret@somehost.com/index.html"'</dd>
+%%
+%%   <dt>host::binary()</dt>
+%%   <dd>This will be `"somehost.com"' for the uri
+%%       `"http://somehost.com/index.html"'.</dd>
+%%
+%%   <dt>port::integer() | undefined</dt>
+%%   <dd>This will be `8080' for the uri
+%%       `"http://somehost.com:8080/index.html"', and `[]' for
+%%       uri `"http://somehost.com/index.html"'.</dd>
+%%
+%%   <dt>path::binary()</dt>
+%%   <dd>This will be `"/index.html"' for the uri
+%%       `"http://somehost.com/index.html?startId=50"'. This will
+%%       be unquoted, so `"http://somehost.com/name+with%20spaces"'
+%%       will be `"/name with spaces"'</dd>
+%%
+%%   <dt>q::dict()</dt>
+%%   <dd> This is a dict of name value pairs from the query. If no query
+%%        was found then it is left empty </dd>
+%%
+%%   <dt>frag::binary()</dt>
+%%   <dd>The fragment part of the url, unquoted. This will be
+%%       `"Section 5"' for the uri
+%%       `"http://somehost.com/index.html#Section+5"'. It will be
+%%       The empty string if no fragment is found.</dd>
+%%
+%%   <dt>raw::binary()</dt>
+%%   <dd>This is the original uri that the above fields were populated
+%%       from. Everything will still be in their original quoted form.
+%%       Note that this may be a best guess as to the uri a user had
+%%       in their browser, as this will most likely be formed by
+%%       concatenating the `Host' header with the `request' line uri.</dd>
+%%  </dl>
+%%
 
 %%============================================================================
 %% API
