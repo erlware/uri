@@ -189,6 +189,9 @@ query_foldl(F, Init, #uri{q = Query}) ->
     query_foldl(F, Init, Query);
 query_foldl(F, Init, Query)
   when erlang:is_binary(Query) ->
+    BinaryQuery = erlang:iolist_to_binary(Query),
+    SplitQuery = binary:split(BinaryQuery, <<"&">>, [global]),
+
     lists:foldl(fun (Part, Acc) ->
                         case binary:split(Part, <<"=">>) of
                             [Key, Value] ->
@@ -198,7 +201,7 @@ query_foldl(F, Init, Query)
                             [Key] ->
                                 F({unquote(Key), true}, Acc)
                         end
-                end, Init, binary:split(erlang:iolist_to_binary(Query), <<"&">>));
+                end, Init, SplitQuery);
 query_foldl(F, Init, Query)
   when erlang:is_list(Query) ->
     lists:foldl(F, Init, Query).
@@ -688,6 +691,8 @@ query_to_proplist_test() ->
     ?assertMatch([{<<"a">>, <<"b">>}], query_to_proplist(<<"a=b&">>)),
     ?assertMatch([{<<"a">>, <<>>}], query_to_proplist(<<"a=">>)),
     ?assertMatch([{<<"a">>, true}, {<<"b">>, <<"c">>}], query_to_proplist(<<"a&b=c">>)),
+    ?assertMatch([{<<"b">>, <<"c">>}, {<<"d">>, <<"g">>}, {<<"a">>, true}],
+                 query_to_proplist(<<"b=c&d=g&a">>)),
     ?assertMatch([{<<"a&b">>, <<"!t=f">>}], query_to_proplist(<<"a%26b=!t%3Df">>)).
 
 to_query_test() ->
