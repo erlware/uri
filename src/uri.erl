@@ -23,8 +23,6 @@
 %%% uri's, but that could/should change in the future.
 -module(uri).
 
--compile(export_all).
-
 -export([new/7, from_string/1, from_http_1_1/3, to_string/1,
          query_foldl/3,
          query_to_proplist/1,
