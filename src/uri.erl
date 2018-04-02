@@ -399,12 +399,14 @@ parse_scheme(<<C, Rest/binary>>, Acc) ->
     parse_scheme(Rest, <<Acc/binary, C>>).
 
 parse_authority(<<$/, $/, Uri/binary>>) ->
-    parse_authority(Uri, <<"">>);
+    parse_authority(Uri, <<>>);
 parse_authority(Uri) ->
-    Uri.
+    {Uri, <<>>}.
 
 parse_authority(<<$/, Rest/binary>>, Acc) ->
     {Acc, <<$/, Rest/binary>>};
+parse_authority(<<$?, Rest/binary>>, Acc) ->
+    {Acc, <<$?, Rest/binary>>};
 parse_authority(<<>>, Acc) ->
     {Acc, <<>>};
 parse_authority(<<C,  Rest/binary>>, Acc) ->
@@ -662,7 +664,7 @@ parse_scheme_test() ->
 parse_authority_test() ->
     ?assertMatch({<<"test.com">>, <<"/here">>}, parse_authority(<<"//test.com/here">>)),
     ?assertMatch({<<"test.com">>, <<"">>}, parse_authority(<<"//test.com">>)),
-    ?assertMatch(<<"/test">>, parse_authority(<<"/test">>)).
+    ?assertMatch({<<"/test">>, <<>>}, parse_authority(<<"/test">>)).
 
 parse_user_info_test() ->
     ?assertMatch({<<"user">>, <<"test.com">>}, parse_user_info(<<"user@test.com">>)),
