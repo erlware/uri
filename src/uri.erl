@@ -23,8 +23,6 @@
 %%% uri's, but that could/should change in the future.
 -module(uri).
 
--compile(export_all).
-
 -export([new/7, from_string/1, from_http_1_1/3, to_string/1,
          query_foldl/3,
          query_to_proplist/1,
@@ -189,6 +187,9 @@ query_foldl(F, Init, #uri{q = Query}) ->
     query_foldl(F, Init, Query);
 query_foldl(F, Init, Query)
   when erlang:is_binary(Query) ->
+    BinaryQuery = erlang:iolist_to_binary(Query),
+    SplitQuery = binary:split(BinaryQuery, <<"&">>, [global]),
+
     lists:foldl(fun (Part, Acc) ->
                         case binary:split(Part, <<"=">>) of
                             [Key, Value] ->
@@ -198,7 +199,7 @@ query_foldl(F, Init, Query)
                             [Key] ->
                                 F({unquote(Key), true}, Acc)
                         end
-                end, Init, binary:split(erlang:iolist_to_binary(Query), <<"&">>));
+                end, Init, SplitQuery);
 query_foldl(F, Init, Query)
   when erlang:is_list(Query) ->
     lists:foldl(F, Init, Query).
@@ -398,12 +399,14 @@ parse_scheme(<<C, Rest/binary>>, Acc) ->
     parse_scheme(Rest, <<Acc/binary, C>>).
 
 parse_authority(<<$/, $/, Uri/binary>>) ->
-    parse_authority(Uri, <<"">>);
+    parse_authority(Uri, <<>>);
 parse_authority(Uri) ->
-    Uri.
+    {Uri, <<>>}.
 
 parse_authority(<<$/, Rest/binary>>, Acc) ->
     {Acc, <<$/, Rest/binary>>};
+parse_authority(<<$?, Rest/binary>>, Acc) ->
+    {Acc, <<$?, Rest/binary>>};
 parse_authority(<<>>, Acc) ->
     {Acc, <<>>};
 parse_authority(<<C,  Rest/binary>>, Acc) ->
@@ -661,7 +664,7 @@ parse_scheme_test() ->
 parse_authority_test() ->
     ?assertMatch({<<"test.com">>, <<"/here">>}, parse_authority(<<"//test.com/here">>)),
     ?assertMatch({<<"test.com">>, <<"">>}, parse_authority(<<"//test.com">>)),
-    ?assertMatch(<<"/test">>, parse_authority(<<"/test">>)).
+    ?assertMatch({<<"/test">>, <<>>}, parse_authority(<<"/test">>)).
 
 parse_user_info_test() ->
     ?assertMatch({<<"user">>, <<"test.com">>}, parse_user_info(<<"user@test.com">>)),
@@ -688,6 +691,8 @@ query_to_proplist_test() ->
     ?assertMatch([{<<"a">>, <<"b">>}], query_to_proplist(<<"a=b&">>)),
     ?assertMatch([{<<"a">>, <<>>}], query_to_proplist(<<"a=">>)),
     ?assertMatch([{<<"a">>, true}, {<<"b">>, <<"c">>}], query_to_proplist(<<"a&b=c">>)),
+    ?assertMatch([{<<"b">>, <<"c">>}, {<<"d">>, <<"g">>}, {<<"a">>, true}],
+                 query_to_proplist(<<"b=c&d=g&a">>)),
     ?assertMatch([{<<"a&b">>, <<"!t=f">>}], query_to_proplist(<<"a%26b=!t%3Df">>)).
 
 to_query_test() ->
